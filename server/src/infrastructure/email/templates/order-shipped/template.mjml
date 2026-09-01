@@ -1,0 +1,25 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Your order is on its way
+</mj-text>
+
+<mj-text>
+  Order <strong>{{orderNumber}}</strong> has left us{{#if carrier}} with {{carrier}}{{/if}}.
+</mj-text>
+
+{{#if trackingNumber}}
+<mj-text color="#52606d">
+  Tracking number: <strong>{{trackingNumber}}</strong>
+</mj-text>
+{{/if}}
+
+{{#if trackingUrl}}
+<mj-button href="{{trackingUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  Track your parcel
+</mj-button>
+{{else}}
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  View your order
+</mj-button>
+{{/if}}

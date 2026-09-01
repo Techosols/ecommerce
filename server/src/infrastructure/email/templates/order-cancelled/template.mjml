@@ -1,0 +1,24 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Order {{orderNumber}} has been cancelled
+</mj-text>
+
+<mj-text>
+  {{#if firstName}}{{firstName}}, this{{else}}This{{/if}} order will not be sent.
+  {{#if reason}}Reason: {{reason}}.{{/if}}
+</mj-text>
+
+{{#if refundExpected}}
+<mj-text color="#52606d">
+  Any payment already taken will be refunded to the original payment method. You will get
+  a separate email when it is issued.
+</mj-text>
+{{/if}}
+
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  View your order
+</mj-button>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  If you did not expect this, reply to this email and we will look into it.
+</mj-text>

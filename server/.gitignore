@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+
+# Secrets — never commit (CLAUDE.md §40)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# Local artefacts
+tmp/
+*.log
+.DS_Store

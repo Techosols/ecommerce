@@ -1,0 +1,19 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  {{#if firstName}}Welcome, {{ firstName }}{{else}}Welcome{{/if}}
+</mj-text>
+
+<mj-text>
+  Your email address is confirmed and your account is ready. You can track orders and manage your
+  details any time.
+</mj-text>
+
+<mj-button
+  href="{{storeUrl}}"
+  background-color="#0b3d2e"
+  color="#ffffff"
+  border-radius="6px"
+  padding="20px 0"
+  font-size="15px"
+>
+  Start shopping
+</mj-button>

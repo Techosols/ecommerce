@@ -1,0 +1,27 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  You have been invited to {{storeName}}
+</mj-text>
+
+<mj-text>
+  {{invitedBy}} has invited you to help run {{storeName}} as <strong>{{roles}}</strong>.
+  Choose a password to activate your account.
+</mj-text>
+
+<mj-button href="{{acceptUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  Set my password
+</mj-button>
+
+<mj-text color="#52606d" font-size="13px">
+  This invitation expires in {{expiresInHours}} hours and can be used once. If the button
+  does not work, paste this into your browser:
+</mj-text>
+
+<mj-text color="#52606d" font-size="12px">
+  {{acceptUrl}}
+</mj-text>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  If you were not expecting this, you can ignore it — the account cannot be used until a
+  password is set.
+</mj-text>

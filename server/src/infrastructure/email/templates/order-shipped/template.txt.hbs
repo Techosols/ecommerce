@@ -1,0 +1,11 @@
+Your order is on its way
+
+Order {{orderNumber}} has left us{{#if carrier}} with {{carrier}}{{/if}}.
+{{#if trackingNumber}}
+Tracking number: {{trackingNumber}}
+{{/if}}
+{{#if trackingUrl}}
+Track your parcel: {{trackingUrl}}
+{{else}}
+View your order: {{orderUrl}}
+{{/if}}

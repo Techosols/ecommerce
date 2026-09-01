@@ -1,0 +1,17 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Delivered
+</mj-text>
+
+<mj-text>
+  Order <strong>{{orderNumber}}</strong> has been delivered. We hope everything is as it
+  should be{{#if firstName}}, {{firstName}}{{/if}}.
+</mj-text>
+
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  View your order
+</mj-button>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  If something is not right, reply to this email and we will sort it out.
+</mj-text>

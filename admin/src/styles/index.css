@@ -1,0 +1,291 @@
+@import 'tailwindcss';
+
+/*
+ * The admin's design tokens — Shopify's palette.
+ *
+ * Everything the UI paints comes from a semantic name here rather than a raw
+ * palette value in a component, so dark mode is one block of overrides and a
+ * rebrand is one block of edits. Components reference `bg-surface`,
+ * `text-muted`, `border-line` — never `bg-white dark:bg-slate-900`.
+ *
+ * ── Why hex, and why these hexes ────────────────────────────────────────────
+ *
+ * The values are Shopify's admin palette, written as hex rather than converted
+ * to oklch. A converted value is a value nobody can check: "is this the same
+ * grey Shopify uses?" has to be answerable by eye against their screen, and
+ * `#f1f1f1` answers it where `oklch(0.955 0 0)` does not.
+ *
+ * The greys are genuinely neutral — no hue at all — which is the single biggest
+ * difference from the palette this replaced. Shopify's admin is achromatic
+ * except where colour carries meaning: a status, a link, a focus ring. That is
+ * what makes a dense operations screen readable, and it is why the brand ramp
+ * below is a *blue* used only for interactive affordances rather than a brand
+ * colour splashed across the furniture.
+ */
+
+@theme {
+  --font-sans:
+    'Inter var', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* Interactive blue. Shopify uses #005bd3 for links, focus rings and selected
+     states — never for page furniture. */
+  --color-brand-50: #f2f7fe;
+  --color-brand-100: #e0f0ff;
+  --color-brand-200: #b6dbff;
+  --color-brand-300: #85c2ff;
+  --color-brand-400: #4c9bf5;
+  --color-brand-500: #0f7ae5;
+  --color-brand-600: #005bd3;
+  --color-brand-700: #0047a8;
+  --color-brand-800: #003a87;
+  --color-brand-900: #002e6b;
+
+  /* Surfaces. The page is grey and the cards are white — the inverse of the
+     usual arrangement, and what makes a column of cards read as a stack of
+     separate things rather than one long document. */
+  --color-canvas: #f1f1f1;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f7f7f7;
+  --color-surface-hover: #f1f1f1;
+
+  --color-line: #e3e3e3;
+  --color-line-strong: #cccccc;
+
+  --color-ink: #303030;
+  --color-ink-soft: #4a4a4a;
+  --color-muted: #616161;
+  --color-faint: #8a8a8a;
+
+  /* The left navigation, which in this palette is *light* — the same grey as
+     the page, with the active item picked out in white. The dark thing on
+     screen is the top bar, below. */
+  --color-rail: #f1f1f1;
+  --color-rail-hover: #e7e7e7;
+  --color-rail-active: #ffffff;
+  --color-rail-ink: #303030;
+  --color-rail-muted: #616161;
+  --color-rail-line: #e3e3e3;
+
+  /* The top bar: near-black, full width, and the only large dark area. */
+  --color-topbar: #1a1a1a;
+  --color-topbar-hover: #303030;
+  --color-topbar-ink: #e3e3e3;
+  --color-topbar-muted: #b5b5b5;
+  --color-topbar-field: #303030;
+
+  /* Status — the operational vocabulary: money in, stock out, things stuck.
+     Each is a text colour dark enough to read on its own pale tint, which is
+     how Shopify's badges work: tinted pill, dark type, no border. */
+  --color-positive: #0c5132;
+  --color-positive-soft: #cdfee1;
+  --color-warning: #5e4200;
+  --color-warning-soft: #ffd6a4;
+  --color-danger: #8e1f0b;
+  --color-danger-soft: #ffe9e8;
+  --color-info: #00527c;
+  --color-info-soft: #ebf9fc;
+
+  /* Two radii, not one: cards are softer than the controls inside them. */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  /* Barely-there elevation. A card is separated from the page by being white
+     on grey; the shadow is a hairline, not a lift. */
+  --shadow-card: 0 1px 0 0 rgb(0 0 0 / 0.05);
+  --shadow-raised: 0 1px 0 0 rgb(0 0 0 / 0.07), 0 0 0 1px rgb(0 0 0 / 0.03);
+  --shadow-overlay:
+    0 4px 12px -2px rgb(0 0 0 / 0.16), 0 2px 6px -2px rgb(0 0 0 / 0.08),
+    0 0 0 1px rgb(0 0 0 / 0.05);
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Dark mode.
+ *
+ * Shopify's admin has no public dark theme, so this is not a copy of one — it
+ * is the same *structure* (neutral greys, colour only where it means something,
+ * cards lighter than the page) inverted. The status tints become dark grounds
+ * with pale type, because a pale tint carrying dark text is unreadable here.
+ */
+.dark {
+  --color-canvas: #1a1a1a;
+  --color-surface: #262626;
+  --color-surface-raised: #2e2e2e;
+  --color-surface-sunken: #212121;
+  --color-surface-hover: #333333;
+
+  --color-line: #3d3d3d;
+  --color-line-strong: #4f4f4f;
+
+  --color-ink: #e3e3e3;
+  --color-ink-soft: #cccccc;
+  --color-muted: #a3a3a3;
+  --color-faint: #7a7a7a;
+
+  --color-rail: #212121;
+  --color-rail-hover: #2e2e2e;
+  --color-rail-active: #383838;
+  --color-rail-ink: #e3e3e3;
+  --color-rail-muted: #a3a3a3;
+  --color-rail-line: #3d3d3d;
+
+  --color-topbar: #0f0f0f;
+  --color-topbar-hover: #262626;
+  --color-topbar-ink: #e3e3e3;
+  --color-topbar-muted: #a3a3a3;
+  --color-topbar-field: #262626;
+
+  --color-positive: #a7f3cd;
+  --color-positive-soft: #10321f;
+  --color-warning: #ffd9a0;
+  --color-warning-soft: #3a2a06;
+  --color-danger: #ffc9c4;
+  --color-danger-soft: #3d1410;
+  --color-info: #bfe6f5;
+  --color-info-soft: #0d2f3f;
+
+  --shadow-card: 0 1px 0 0 rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 1px 0 0 rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-overlay:
+    0 4px 12px -2px rgb(0 0 0 / 0.7), 0 2px 6px -2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Shopify's admin runs at 13px, not 16. It is a working tool with a lot on
+       screen, and the smaller base is what lets a variant table fit. */
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  /* One focus ring for the whole app, so nothing can quietly ship without a
+     visible keyboard affordance.
+
+     Text fields are excluded on purpose: they thicken their own inset ring on
+     focus, and an outline *outside* that would draw two rings around every
+     focused input. Everything else — links, buttons, anything given a tabindex
+     — gets the outline. */
+  :where(a, button, [tabindex]):focus-visible {
+    @apply outline-brand-600 outline-2 outline-offset-1;
+  }
+
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+
+  /* Tabular figures everywhere money and counts appear. Proportional digits in
+     a column of totals make the column impossible to scan. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* The contextual save bar drops in from the top of the frame. */
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.15s ease-out;
+  }
+
+  .animate-pop-in {
+    animation: pop-in 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-slide-down {
+    animation: slide-down 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-pop-in,
+    .animate-slide-in-right,
+    .animate-slide-in-left,
+    .animate-slide-down {
+      animation: none;
+    }
+  }
+}

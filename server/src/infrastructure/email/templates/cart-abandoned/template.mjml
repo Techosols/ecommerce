@@ -1,0 +1,28 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  You left something behind
+</mj-text>
+
+<mj-text>
+  {{#if firstName}}{{firstName}}, your{{else}}Your{{/if}} basket at {{storeName}} is still
+  here.
+</mj-text>
+
+<mj-table font-size="14px" cellpadding="6">
+  {{#each items}}
+  <tr>
+    <td style="padding:6px 0;border-bottom:1px solid #e4e7eb;">
+      {{this.title}}{{#if this.variant}} <span style="color:#7b8794;">({{this.variant}})</span>{{/if}}
+      <span style="color:#7b8794;">× {{this.quantity}}</span>
+    </td>
+  </tr>
+  {{/each}}
+</mj-table>
+
+<mj-button href="{{cartUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  Pick up where you left off
+</mj-button>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  Prices and availability are checked when you order, so what you see then is what applies.
+</mj-text>

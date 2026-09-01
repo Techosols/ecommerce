@@ -1,0 +1,16 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Your password was {{ action }}
+</mj-text>
+
+<mj-text>
+  The password on your account was {{ action }} on {{ changedAt }}. You have been signed out on
+  every other device.
+</mj-text>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="8px">
+  If this was not you, contact us immediately:
+</mj-text>
+
+<mj-text color="#52606d" font-size="13px">
+  {{ supportUrl }}
+</mj-text>

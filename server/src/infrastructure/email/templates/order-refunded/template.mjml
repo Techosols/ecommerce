@@ -1,0 +1,18 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  {{#if full}}Your refund has been issued{{else}}A partial refund has been issued{{/if}}
+</mj-text>
+
+<mj-text>
+  We have refunded <strong>{{amount}}</strong> against order <strong>{{orderNumber}}</strong>.
+  {{#if reason}}Reason: {{reason}}.{{/if}}
+</mj-text>
+
+<mj-text color="#52606d">
+  It goes back to the payment method you used. Depending on your bank, it can take a few
+  working days to appear.
+</mj-text>
+
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  View your order
+</mj-button>

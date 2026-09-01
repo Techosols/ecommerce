@@ -1,0 +1,25 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  You already have an account
+</mj-text>
+
+<mj-text>
+  Someone tried to create an account using this address. You already have one, so we did not create
+  a second.
+</mj-text>
+
+<mj-text> If that was you and you could not sign in, you can reset your password: </mj-text>
+
+<mj-button
+  href="{{resetUrl}}"
+  background-color="#0b3d2e"
+  color="#ffffff"
+  border-radius="6px"
+  padding="20px 0"
+  font-size="15px"
+>
+  Reset my password
+</mj-button>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  If it was not you, no action is needed. Nothing about your account has changed.
+</mj-text>

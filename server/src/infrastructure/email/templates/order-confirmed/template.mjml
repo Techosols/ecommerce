@@ -1,0 +1,18 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Your order is confirmed
+</mj-text>
+
+<mj-text>
+  {{#if firstName}}{{firstName}}, we{{else}}We{{/if}} have received payment of
+  <strong>{{total}}</strong> for order <strong>{{orderNumber}}</strong>, and it is now
+  being prepared.
+</mj-text>
+
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  Track your order
+</mj-button>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  You will hear from us again when it ships.
+</mj-text>

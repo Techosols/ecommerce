@@ -1,0 +1,108 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Copperleaf — the storefront's visual language.
+ *
+ * A shop, not a dashboard. The admin's palette is built for reading dense
+ * tables at length; this one is built to make food look worth buying, so it
+ * runs warm, leans on one deep green, and keeps copper for the few things that
+ * should catch the eye — a price, a sale, the button that adds to a basket.
+ *
+ * Everything below is a token. Components never name a hex value, which is what
+ * makes retuning the shop a change to this file rather than a search across
+ * forty components.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Ink and paper. The neutrals carry a green bias rather than being flat
+     grey — a pure #888 beside a green accent reads as unconsidered. */
+  --color-paper: #fbfaf7;
+  --color-surface: #ffffff;
+  --color-sunken: #f4f2ec;
+  --color-line: #e6e2d9;
+  --color-line-strong: #d5cfc2;
+
+  --color-ink: #171d1a;
+  --color-ink-soft: #3c4642;
+  --color-muted: #6b7671;
+  --color-faint: #949d98;
+
+  /* Forest green: navigation, primary actions, links. */
+  --color-brand-50: #eef5f1;
+  --color-brand-100: #d6e7dd;
+  --color-brand-300: #86b39c;
+  --color-brand-500: #2f7a58;
+  --color-brand-600: #1f5f45;
+  --color-brand-700: #174a36;
+  --color-brand-900: #0d2b1f;
+
+  /* Copper. Spent sparingly — a sale price, a highlight, never a whole panel. */
+  --color-copper-100: #f6e6da;
+  --color-copper-500: #b4622d;
+  --color-copper-600: #954f22;
+
+  /* Semantic, and separate from the accent so "in stock" never competes with
+     "add to basket" for the same green. */
+  --color-good: #2f7a58;
+  --color-warn: #a86a12;
+  --color-bad: #a33223;
+  --color-good-soft: #e7f2ec;
+  --color-warn-soft: #fbf1de;
+  --color-bad-soft: #f8e8e5;
+
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-card: 0.75rem;
+
+  --shadow-card: 0 1px 2px rgb(23 29 26 / 0.05), 0 1px 3px rgb(23 29 26 / 0.06);
+  --shadow-lift: 0 6px 16px -4px rgb(23 29 26 / 0.12), 0 2px 6px -2px rgb(23 29 26 / 0.07);
+}
+
+/* The shop is a daylight place and commits to one look, so there is no dark
+   palette — but every colour is still painted explicitly rather than inherited,
+   so the page holds on any host background. */
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink-soft);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  text-wrap: balance;
+  letter-spacing: -0.015em;
+}
+
+/* Prices, quantities and anything that lines up in a column. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus is never removed, only restyled: a shop that cannot be
+   operated from the keyboard is a shop some people cannot use. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

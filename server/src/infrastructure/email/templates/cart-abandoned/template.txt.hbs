@@ -1,0 +1,12 @@
+You left something behind
+
+{{#if firstName}}{{firstName}}, your{{else}}Your{{/if}} basket at {{storeName}} is still here.
+
+{{#each items}}
+- {{this.title}}{{#if this.variant}} ({{this.variant}}){{/if}} x {{this.quantity}}
+{{/each}}
+
+Pick up where you left off: {{cartUrl}}
+
+Prices and availability are checked when you order, so what you see then is what
+applies.

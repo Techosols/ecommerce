@@ -1,0 +1,15 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Email delivery is working
+</mj-text>
+
+<mj-text>
+  This is an automated check sent from the <strong>{{ environment }}</strong> environment at
+  {{ triggeredAt }}. Receiving it confirms that template rendering, the job queue and the configured
+  email provider are all functioning.
+</mj-text>
+
+{{#if note}}
+<mj-text color="#52606d" font-size="14px"> Note: {{ note }} </mj-text>
+{{/if}}
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px"> No action is required. </mj-text>

@@ -1,0 +1,31 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px"> Reset your password </mj-text>
+
+<mj-text>
+  Someone asked to reset the password for this account. If that was you, choose a new password using
+  the button below.
+</mj-text>
+
+<mj-button
+  href="{{resetUrl}}"
+  background-color="#0b3d2e"
+  color="#ffffff"
+  border-radius="6px"
+  padding="20px 0"
+  font-size="15px"
+>
+  Choose a new password
+</mj-button>
+
+<mj-text color="#52606d" font-size="13px">
+  This link expires in {{ expiresInMinutes }} minutes and can be used once. If the button does not
+  work, paste this into your browser:
+</mj-text>
+
+<mj-text color="#52606d" font-size="12px">
+  {{ resetUrl }}
+</mj-text>
+
+<mj-text color="#7b8794" font-size="13px" padding-top="16px">
+  If you did not ask for this, no action is needed — your password has not changed. Resetting it
+  will also sign you out everywhere.
+</mj-text>

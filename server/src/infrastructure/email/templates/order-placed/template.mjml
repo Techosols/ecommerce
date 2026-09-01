@@ -1,0 +1,53 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="8px">
+  Thank you{{#if firstName}}, {{firstName}}{{/if}} — we have your order
+</mj-text>
+
+<mj-text>
+  Order <strong>{{orderNumber}}</strong>, placed {{placedAt}}. We will email you again
+  the moment it is on its way.
+</mj-text>
+
+<mj-table font-size="14px" cellpadding="6">
+  {{#each items}}
+  <tr>
+    <td style="padding:6px 0;border-bottom:1px solid #e4e7eb;">
+      {{this.title}}{{#if this.variant}} <span style="color:#7b8794;">({{this.variant}})</span>{{/if}}
+      <span style="color:#7b8794;">× {{this.quantity}}</span>
+    </td>
+    <td align="right" style="padding:6px 0;border-bottom:1px solid #e4e7eb;">{{this.total}}</td>
+  </tr>
+  {{/each}}
+  <tr>
+    <td style="padding-top:10px;color:#52606d;">Subtotal</td>
+    <td align="right" style="padding-top:10px;">{{subtotal}}</td>
+  </tr>
+  {{#if discount}}
+  <tr>
+    <td style="color:#52606d;">Discount</td>
+    <td align="right">−{{discount}}</td>
+  </tr>
+  {{/if}}
+  <tr>
+    <td style="color:#52606d;">Delivery{{#if shippingMethod}} ({{shippingMethod}}){{/if}}</td>
+    <td align="right">{{shipping}}</td>
+  </tr>
+  {{#if tax}}
+  <tr>
+    <td style="color:#52606d;">Tax</td>
+    <td align="right">{{tax}}</td>
+  </tr>
+  {{/if}}
+  <tr>
+    <td style="padding-top:8px;font-weight:600;">Total</td>
+    <td align="right" style="padding-top:8px;font-weight:600;">{{total}}</td>
+  </tr>
+</mj-table>
+
+<mj-text color="#52606d" font-size="13px" padding-top="16px">
+  Delivering to:<br />{{shippingAddress}}
+</mj-text>
+
+<mj-button href="{{orderUrl}}" background-color="#0b3d2e" color="#ffffff"
+           border-radius="6px" padding="20px 0" font-size="15px">
+  View your order
+</mj-button>

@@ -1,0 +1,14 @@
+-- migrate:ignore
+-- 0009_discounts.sql — NOT A MIGRATION. Safe to delete; deleting it is the right fix.
+--
+-- This file is a leftover from an early draft of the schema that was renumbered
+-- before any of it shipped. It created discounts and its restriction tables,
+-- which 0014_discounts.sql creates properly — and because the runner
+-- takes every .sql file in this folder in sorted order, having both meant the
+-- second one hit "already exists" and `npm run db:migrate` stopped dead.
+--
+-- Its contents have been replaced with this notice, and `migrate:ignore` on the
+-- first line takes it out of the migration set entirely: it is not ordered, not
+-- numbered, not validated and never run. That is a stopgap, not a resting
+-- place — the file was neutralised remotely because it could not be deleted
+-- remotely. Delete it.

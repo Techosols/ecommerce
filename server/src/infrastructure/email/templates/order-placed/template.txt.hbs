@@ -1,0 +1,20 @@
+Thank you{{#if firstName}}, {{firstName}}{{/if}} — we have your order
+
+Order {{orderNumber}}, placed {{placedAt}}.
+
+{{#each items}}
+- {{this.title}}{{#if this.variant}} ({{this.variant}}){{/if}} x {{this.quantity}}  {{this.total}}
+{{/each}}
+
+Subtotal: {{subtotal}}
+{{#if discount}}Discount: -{{discount}}
+{{/if}}Delivery{{#if shippingMethod}} ({{shippingMethod}}){{/if}}: {{shipping}}
+{{#if tax}}Tax: {{tax}}
+{{/if}}Total: {{total}}
+
+Delivering to:
+{{shippingAddress}}
+
+View your order: {{orderUrl}}
+
+We will email you again the moment it is on its way.
