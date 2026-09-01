@@ -55,6 +55,7 @@ function context(overrides: Partial<MethodContext> = {}): MethodContext {
     subtotalCents: 5000,
     countryCode: 'GB',
     customerId: null,
+    signedIn: false,
     requiresShipping: true,
     openCodOrders: 0,
     ...overrides,
@@ -129,7 +130,20 @@ describe('cash on delivery eligibility', () => {
   it('can be restricted to account holders', () => {
     const ctx = context({ settings: settings({ codRequiresAccount: true }) })
     expect(cod.eligibility(ctx).eligible).toBe(false)
-    expect(cod.eligibility({ ...ctx, customerId: 'a-customer' }).eligible).toBe(true)
+    expect(cod.eligibility({ ...ctx, signedIn: true }).eligible).toBe(true)
+  })
+
+  it('still refuses a guest who has a customer record but did not sign in', () => {
+    // The case this setting exists for. Checkout gives every guest a customer
+    // record now, so a rule keyed on `customerId` would wave them all through
+    // and the lever would quietly do nothing.
+    const ctx = context({
+      settings: settings({ codRequiresAccount: true }),
+      customerId: 'a-customer-made-at-checkout',
+      signedIn: false,
+    })
+    expect(cod.eligibility(ctx).eligible).toBe(false)
+    expect(cod.eligibility(ctx)).toMatchObject({ reason: expect.stringMatching(/sign in/i) })
   })
 
   it('caps how many unpaid COD orders one customer may hold', () => {

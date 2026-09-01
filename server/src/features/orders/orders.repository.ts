@@ -289,19 +289,34 @@ export const ordersRepository = {
    * A guest order, found by the two things its owner has: the number and the
    * email it was placed with.
    *
-   * `customer_id IS NULL` is the important part of this predicate. Order numbers
-   * come from a sequence and are therefore guessable, so without it anyone who
-   * knew a customer's email address could walk the numbers and read that
-   * person's order history without their password. A registered customer signs
-   * in instead; this exists only for the case where there is no account to sign
+   * The restriction to accounts that **cannot be signed into** is the important
+   * part of this predicate, and it is load-bearing. Order numbers come from a
+   * sequence and are therefore guessable, so without it anyone who knew a
+   * customer's email address could walk the numbers and read that person's
+   * order history without their password. A registered customer signs in
+   * instead; this exists only for the case where there is no account to sign
    * in to.
+   *
+   * This used to read `customer_id IS NULL`, which meant the same thing back
+   * when a guest order had no customer at all. Checkout now creates a customer
+   * record for every guest, so that spelling would have opened exactly the hole
+   * described above — the invariant is unchanged, only the way of asking it.
+   * A password hash is precisely what "there is an account to sign in to"
+   * means, and it is what `login` itself checks.
+   *
+   * A guest who later sets a password loses this route to their old orders and
+   * gains a better one: those orders are attached to their customer id, so they
+   * are simply in their order history once they sign in.
    *
    * The email match is case-insensitive because the column is `citext`.
    */
   async findGuestOrder(orderNumber: string, email: string): Promise<Order | undefined> {
     const row = await queryOne<OrderRow>(
-      `SELECT * FROM orders
-        WHERE order_number = $1 AND email = $2 AND customer_id IS NULL`,
+      `SELECT o.* FROM orders o
+         LEFT JOIN users u ON u.id = o.customer_id
+        WHERE o.order_number = $1
+          AND o.email = $2
+          AND (o.customer_id IS NULL OR u.password_hash IS NULL)`,
       [orderNumber, email],
       { name: 'orders.findGuestOrder' },
     )

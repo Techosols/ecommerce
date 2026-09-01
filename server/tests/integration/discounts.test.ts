@@ -279,6 +279,21 @@ describeIfDatabase('discounts', () => {
       expect(signedIn.status).toBe(200)
     })
 
+    it('still refuses a guest at checkout, who now has a customer record', async () => {
+      // The regression this guards. Checkout attaches a customer to every
+      // order, so a restriction keyed on "is there a customer" would let every
+      // guest through and the setting would quietly do nothing.
+      const discount = await createDiscount(app, owner.accessToken, { requiresCustomer: true })
+
+      const placed = await checkout(await basket(5000), {
+        shippingMethodId: methodId,
+        discountCode: discount.code,
+      })
+
+      expect(placed.status).toBe(422)
+      expect(placed.body.code).toBe('DISCOUNT_REQUIRES_ACCOUNT')
+    })
+
     it('says the code is used up once its total limit is reached', async () => {
       const discount = await createDiscount(app, owner.accessToken, { usageLimitTotal: 1 })
       const buyer = await basket(5000)

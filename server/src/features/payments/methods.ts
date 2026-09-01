@@ -44,6 +44,15 @@ export interface MethodContext {
   subtotalCents: number
   countryCode: string
   customerId: string | null
+  /**
+   * Whether the shopper proved who they are, rather than merely being known.
+   *
+   * These stopped being the same question when checkout began creating a
+   * customer record for every guest: `customerId` is now set for everybody, so
+   * a rule that means "must be signed in" has to ask this instead. Anyone can
+   * type an email; only an account holder can present a token for it.
+   */
+  signedIn: boolean
   /** False for a wholly digital basket — nothing to hand cash over for. */
   requiresShipping: boolean
   /** Unpaid COD orders this customer already holds. Zero for a guest. */
@@ -129,12 +138,16 @@ const cashOnDelivery: PaymentMethodDefinition = {
       return no('Cash on delivery is not available for this delivery address')
     }
 
-    if (s.codRequiresAccount && !context.customerId) {
+    // Deliberately `signedIn`, not `customerId`. Since checkout creates a
+    // customer for every guest, `customerId` would be true of everyone and
+    // this lever would silently stop doing anything at all.
+    if (s.codRequiresAccount && !context.signedIn) {
       return no('Sign in to pay with cash on delivery')
     }
 
-    // The cap is per customer, so a guest is never over it — which is exactly
-    // why `codRequiresAccount` exists as a separate lever.
+    // The cap is per customer. It now catches guests too, because the shop
+    // knows a repeat guest is one person — which is a tightening, and the
+    // reason `codRequiresAccount` remains a separate and stricter lever.
     if (
       s.codMaxOpenOrders !== null &&
       context.customerId &&

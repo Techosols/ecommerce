@@ -409,6 +409,28 @@ describeIfDatabase('order lifecycle', () => {
       expect(res.status).toBe(404)
     })
 
+    it('will not surface a registered account\u2019s order placed as a guest', async () => {
+      // The regression this guards: checkout now attaches a customer to every
+      // order, so a lookup keyed on "no customer" would have started matching
+      // registered people's orders. What keeps them out is that their account
+      // has a password \u2014 they have somewhere to sign in.
+      const customer = await createUserAndLogin(app)
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      // No token: they checked out without signing in, under their own email.
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: customer.user.email,
+      })
+
+      const res = await lookup({
+        orderNumber: placed.body.data.orderNumber,
+        email: customer.user.email,
+      })
+      expect(res.status).toBe(404)
+    })
+
     it('shows the customer view, not the operational one', async () => {
       const order = await guestOrder()
       await request(app)

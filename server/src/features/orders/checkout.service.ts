@@ -14,6 +14,7 @@
 import type { Actor } from '../../shared/auth/actor.js'
 import { DomainRuleError, ERROR_CODES } from '../../shared/errors/index.js'
 import { cartsService, type ResolvedCart } from '../carts/index.js'
+import { customersService } from '../customers/index.js'
 import { discountsService } from '../discounts/index.js'
 import { availableMethods, getPaymentMethod, type MethodContext } from '../payments/index.js'
 import { settingsService, taxAddedTo } from '../settings/index.js'
@@ -33,6 +34,7 @@ async function methodContext(args: {
   subtotalCents: number
   countryCode: string
   customerId: string | null
+  signedIn: boolean
   requiresShipping: boolean
 }): Promise<MethodContext> {
   return {
@@ -40,6 +42,7 @@ async function methodContext(args: {
     subtotalCents: args.subtotalCents,
     countryCode: args.countryCode,
     customerId: args.customerId,
+    signedIn: args.signedIn,
     requiresShipping: args.requiresShipping,
     openCodOrders: args.customerId ? await ordersRepository.countOpenCod(args.customerId) : 0,
   }
@@ -58,12 +61,40 @@ export const checkoutService = {
     input: CheckoutInput,
     context: { customerId: string | null; source?: 'storefront' | 'admin'; actor?: Actor | null },
   ): Promise<OrderDetail> {
+    /**
+     * A guest becomes a customer here, before anything is priced or reserved.
+     *
+     * This is the only line that makes it happen, and it is placed here rather
+     * than inside `ordersService.checkout` on purpose: resolving the id *first*
+     * means everything downstream — `assertCanOrder`, per-customer discount
+     * limits, the cash-on-delivery open-order cap, the order's `customer_id`,
+     * and the `recordPurchase` that follows payment — sees a real customer
+     * with no further change. Guest checkout was previously a way around every
+     * one of those per-customer rules; it no longer is.
+     *
+     * `placeDraft` deliberately does not do this. A staff member who left the
+     * customer field empty on a draft meant to.
+     */
+    // Captured before the line below, which is the whole point: after it,
+    // `customerId` is set for everybody and can no longer answer this.
+    const signedIn = context.customerId !== null
+
+    const customerId =
+      context.customerId ??
+      (await customersService.ensureForCheckout({
+        email: input.email,
+        firstName: input.shippingAddress.firstName,
+        lastName: input.shippingAddress.lastName,
+        phone: input.phone ?? input.shippingAddress.phone ?? null,
+      }))
+
     return ordersService.checkout(input, {
       ...context,
+      customerId,
       quoteShipping: (args) => shippingService.rateForCheckout(args),
-      applyDiscount: (args) => discountsService.quote(args),
+      applyDiscount: (args) => discountsService.quote({ ...args, signedIn }),
       redeemDiscount: (args) => discountsService.redeem(args),
-      resolvePaymentMethod: (args) => this.resolveMethod(args),
+      resolvePaymentMethod: (args) => this.resolveMethod({ ...args, signedIn }),
     })
   },
 
@@ -95,7 +126,13 @@ export const checkoutService = {
         applyDiscount: (args) => discountsService.quote(args),
         redeemDiscount: (args) => discountsService.redeem(args),
         // Staff, not a customer — so `manual` is allowed here and nowhere else.
-        resolvePaymentMethod: (args) => this.resolveMethod(args, { customerFacing: false }),
+        // `signedIn` follows whether staff named a customer: they either
+        // identified this buyer or deliberately did not.
+        resolvePaymentMethod: (args) =>
+          this.resolveMethod(
+            { ...args, signedIn: context.customerId !== null },
+            { customerFacing: false },
+          ),
       },
     )
   },
@@ -122,6 +159,8 @@ export const checkoutService = {
       subtotalCents: number
       countryCode: string
       customerId: string | null
+      /** Whether the shopper authenticated, as opposed to merely being known. */
+      signedIn: boolean
       requiresShipping: boolean
     },
     options: { customerFacing?: boolean } = {},
@@ -192,6 +231,8 @@ export const checkoutService = {
         code: input.discountCode,
         subtotalCents: subtotal,
         customerId: input.customerId,
+        // A preview runs before any guest record exists, so these still agree.
+        signedIn: input.customerId !== null,
         lines: cart.lines.map((line) => ({
           productId: line.productId,
           lineTotalCents: line.lineTotal.amount,
@@ -220,6 +261,9 @@ export const checkoutService = {
       subtotalCents: subtotal,
       countryCode: input.countryCode,
       customerId: input.customerId,
+      // A preview runs before any guest record exists, so the two questions
+      // still have the same answer here.
+      signedIn: input.customerId !== null,
       requiresShipping: needsShipping,
     })
     const methods = availableMethods(context, {

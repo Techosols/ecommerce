@@ -238,6 +238,122 @@ describeIfDatabase('checkout', () => {
     })
   })
 
+  // ── Who bought it ─────────────────────────────────────────────────────────
+
+  /**
+   * A guest checkout produces a customer. The point is that "guest" describes
+   * how somebody bought, not whether the shop remembers them: two orders from
+   * one email are one person in the Customers list, and every per-customer rule
+   * applies to them.
+   */
+  describe('a guest becomes a customer', () => {
+    /** The Customers list is the real surface, so assert through it. */
+    const findCustomer = async (email: string) => {
+      const res = await admin(`/admin/customers?query=${encodeURIComponent(email)}`)
+      return res.body.data.find((row: { email: string }) => row.email === email)
+    }
+
+    it('creates a customer record for an email that has never bought here', async () => {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: 'first-time@example.test',
+      })
+
+      expect(placed.status).toBe(201)
+      const customer = await findCustomer('first-time@example.test')
+      expect(customer).toBeDefined()
+      // Named from the shipping address, which is all a guest told us.
+      expect(customer).toMatchObject({ firstName: 'Ada', tags: ['guest'] })
+    })
+
+    it('puts the order on that customer rather than leaving it orphaned', async () => {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: 'attached@example.test',
+      })
+
+      const order = await admin(`/admin/orders/${placed.body.data.id}`)
+      const customer = await findCustomer('attached@example.test')
+      expect(order.body.data.customerId).toBe(customer.id)
+    })
+
+    it('reuses the record on a second order instead of forking a duplicate', async () => {
+      const product = await sellableProduct(app, owner.accessToken, { quantity: 10 })
+
+      for (const _ of [1, 2]) {
+        const shopper = guest(app)
+        await addToCart(shopper, product.variants[0]!.id, 1)
+        await checkout(shopper, { shippingMethodId: methodId, email: 'repeat@example.test' })
+      }
+
+      const res = await admin('/admin/customers?query=repeat@example.test')
+      expect(res.body.data).toHaveLength(1)
+    })
+
+    it('attaches to an existing account when the shopper did not log in', async () => {
+      const registered = await createUserAndLogin(app, { roles: ['customer'] })
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+
+      // No Authorization header — a guest checkout, under their email.
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: registered.user.email,
+      })
+
+      const order = await admin(`/admin/orders/${placed.body.data.id}`)
+      expect(order.body.data.customerId).toBe(registered.user.id)
+      // Their own account, not a second one wearing the shop's guest tag.
+      const customer = await findCustomer(registered.user.email)
+      expect(customer.tags).not.toContain('guest')
+    })
+
+    it('leaves the created record unable to be signed into', async () => {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      await checkout(shopper, { shippingMethodId: methodId, email: 'nologin@example.test' })
+
+      // The shop made a record of them; it did not make them an account.
+      const attempt = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'nologin@example.test', password: 'anything-at-all-1234' })
+      expect(attempt.status).toBe(401)
+    })
+
+    it('does not subscribe them to marketing', async () => {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      await checkout(shopper, { shippingMethodId: methodId, email: 'noconsent@example.test' })
+
+      const customer = await findCustomer('noconsent@example.test')
+      expect(customer.acceptsMarketing).toBe(false)
+    })
+
+    it('records how the record came to exist', async () => {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      await checkout(shopper, { shippingMethodId: methodId, email: 'timeline@example.test' })
+
+      const customer = await findCustomer('timeline@example.test')
+      const events = await admin(`/admin/customers/${customer.id}/events`)
+      expect(events.body.data.map((event: { kind: string }) => event.kind)).toContain(
+        'account.created_at_checkout',
+      )
+    })
+  })
+
   // ── The transaction ───────────────────────────────────────────────────────
 
   describe('all or nothing', () => {
@@ -363,7 +479,11 @@ describeIfDatabase('checkout', () => {
   // ── Who is checking out ───────────────────────────────────────────────────
 
   describe('guests and customers', () => {
-    it('lets a guest buy without an account', async () => {
+    it('lets a guest buy without an account, and remembers them anyway', async () => {
+      // This used to assert `customer_id IS NULL`. It no longer is: checking
+      // out without logging in still requires no account, but it no longer
+      // means the shop forgets who bought. The guarantee that matters to the
+      // shopper — no registration step, no password — is the one below.
       const product = await sellableProduct(app, owner.accessToken)
       const shopper = guest(app)
       await addToCart(shopper, product.variants[0]!.id, 1)
@@ -375,7 +495,14 @@ describeIfDatabase('checkout', () => {
         `SELECT customer_id FROM orders WHERE id = $1`,
         [res.body.data.id],
       )
-      expect(row?.customer_id).toBeNull()
+      expect(row?.customer_id).not.toBeNull()
+
+      // And nothing was set that could be signed into.
+      const credentials = await queryOne<{ password_hash: string | null }>(
+        `SELECT password_hash FROM users WHERE id = $1`,
+        [row!.customer_id],
+      )
+      expect(credentials?.password_hash).toBeNull()
     })
 
     it('attaches the order to a signed-in customer', async () => {

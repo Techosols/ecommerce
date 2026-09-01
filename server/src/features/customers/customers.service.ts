@@ -38,6 +38,9 @@ const log = createLogger('customers')
 /** Enough to be a real address book, few enough to bound the read. */
 const MAX_ADDRESSES = 20
 
+/** Marks a customer record the shop created at checkout rather than one a person opened. */
+const GUEST_TAG = 'guest'
+
 export const customersService = {
   // ── Admin surface ─────────────────────────────────────────────────────────
 
@@ -325,6 +328,78 @@ export const customersService = {
 
     log.info({ customerId: created.id, access: input.access }, 'customer created')
     return this.getById(created.id)
+  },
+
+  /**
+   * The customer behind a checkout, creating one if this email has never
+   * bought here before.
+   *
+   * A guest order used to be a `customer_id` of NULL and an email held as a
+   * loose string, which meant the same person buying three times was three
+   * unrelated orders and nobody in the Customers list. This closes that: after
+   * checkout, every order points at a customer record, whether or not the
+   * shopper ever chose to register.
+   *
+   * **An existing account wins.** If the email already belongs to somebody, the
+   * order joins their history rather than forking a second record of the same
+   * person — the whole reason there is one identity table. That has a
+   * deliberate consequence: a customer the shop has disabled cannot slip past
+   * `assertCanOrder` by not logging in, because checkout now knows who they
+   * are. It leaks nothing in the other direction; the shopper still sees only
+   * what the guest order-lookup gives them, and holding somebody's email has
+   * never been proof of holding their inbox.
+   *
+   * **The record cannot be signed into.** No password hash is written, which
+   * `login` already refuses. Setting one is the shopper's own act, through the
+   * ordinary reset-password flow — so a person who never registered still has
+   * not, and their record is a shop's memory of them, not an account made in
+   * their name.
+   *
+   * No marketing consent is recorded here under any circumstances. Typing an
+   * email to receive a receipt is not a subscription, and checkout carries no
+   * opt-in field to say otherwise.
+   */
+  async ensureForCheckout(input: {
+    email: string
+    firstName?: string | null
+    lastName?: string | null
+    phone?: string | null
+  }): Promise<string> {
+    const email = input.email.trim().toLowerCase()
+
+    const existing = await usersService.getByEmail(email)
+    if (existing) return existing.id
+
+    const created = await usersService.create({
+      email,
+      // Deliberately absent — see above.
+      passwordHash: null,
+      firstName: input.firstName?.trim() || null,
+      lastName: input.lastName?.trim() || null,
+      roles: ['customer'],
+    })
+
+    // Name and phone come off the shipping address, which is the only thing a
+    // guest told us about themselves. `updateAdmin` rather than the create
+    // call because phone is a customer-record column, not an identity one.
+    if (input.phone?.trim()) {
+      await repo.updateAdmin(created.id, { phone: input.phone.trim() })
+    }
+
+    // Tagged so staff can tell a record the shop made from one a person chose
+    // to open. Removable, and never re-applied — a guest who later registers
+    // and has the tag taken off keeps it off.
+    await repo.addTags(created.id, [GUEST_TAG])
+
+    // No actor: nobody did this, checkout did.
+    await this.recordEvent(created.id, {
+      kind: 'account.created_at_checkout',
+      body: null,
+      actor: null,
+    })
+
+    log.info({ customerId: created.id }, 'customer created at checkout')
+    return created.id
   },
 
   async updateAdmin(

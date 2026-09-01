@@ -420,6 +420,15 @@ export const discountsService = {
     subtotalCents: number
     customerId: string | null
     /**
+     * Whether the shopper authenticated, as distinct from being known.
+     *
+     * `customerId` stopped answering that question once checkout began giving
+     * every guest a customer record. Defaults to "whoever we have is signed
+     * in", which is right for every caller that has no guests — the admin,
+     * drafts — and wrong only for checkout, which passes it explicitly.
+     */
+    signedIn?: boolean
+    /**
      * The basket, when the caller has it. Required for a scoped discount to
      * mean anything; an order-wide one ignores it.
      */
@@ -437,7 +446,11 @@ export const discountsService = {
     if (discount.endsAt && discount.endsAt <= now) {
       throw new DomainRuleError(ERROR_CODES.DISCOUNT_EXPIRED, 'That code has expired')
     }
-    if (discount.requiresCustomer && !input.customerId) {
+    // `signedIn`, not `customerId`: a code restricted to account holders means
+    // people who can log in, and a guest now has a customer record like anyone
+    // else. Keyed on `customerId` this restriction would pass for everybody.
+    const signedIn = input.signedIn ?? input.customerId !== null
+    if (discount.requiresCustomer && !signedIn) {
       throw new DomainRuleError(
         ERROR_CODES.DISCOUNT_REQUIRES_ACCOUNT,
         'Sign in to use that code',
