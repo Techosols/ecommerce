@@ -340,6 +340,45 @@ describeIfDatabase('checkout', () => {
       expect(customer.acceptsMarketing).toBe(false)
     })
 
+    it('leaves nothing behind when the checkout fails', async () => {
+      // The record is written inside the order's transaction, so an abandoned
+      // checkout — a missing delivery option here — rolls it back with
+      // everything else. Otherwise the Customers list fills with people who
+      // never bought anything.
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+
+      const failed = await checkout(shopper, {
+        shippingMethodId: null,
+        email: 'never-completed@example.test',
+      })
+
+      expect(failed.status).toBe(422)
+      expect(await findCustomer('never-completed@example.test')).toBeUndefined()
+    })
+
+    it('still recognises a returning guest before pricing, so their limits apply', async () => {
+      // The other half of the split: the *lookup* happens before anything is
+      // priced, which is what lets per-customer rules see a repeat guest at
+      // all. Checked through the COD open-order cap, which is per customer.
+      await setSettings({ codMaxOpenOrders: 1 })
+      const product = await sellableProduct(app, owner.accessToken, { quantity: 10 })
+
+      const first = guest(app)
+      await addToCart(first, product.variants[0]!.id, 1)
+      const one = await checkout(first, { shippingMethodId: methodId, email: 'capped@example.test' })
+      expect(one.status).toBe(201)
+
+      const second = guest(app)
+      await addToCart(second, product.variants[0]!.id, 1)
+      const two = await checkout(second, { shippingMethodId: methodId, email: 'capped@example.test' })
+
+      // Previously this was a way around the cap entirely.
+      expect(two.status).toBe(422)
+      expect(two.body.message).toMatch(/maximum number of unpaid orders/i)
+    })
+
     it('records how the record came to exist', async () => {
       const product = await sellableProduct(app, owner.accessToken)
       const shopper = guest(app)

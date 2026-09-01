@@ -359,16 +359,27 @@ export const customersService = {
    * email to receive a receipt is not a subscription, and checkout carries no
    * opt-in field to say otherwise.
    */
-  async ensureForCheckout(input: {
+  async findForCheckout(email: string): Promise<string | null> {
+    const existing = await usersService.getByEmail(email.trim().toLowerCase())
+    return existing?.id ?? null
+  },
+
+  /**
+   * Creates the customer record for an email that has never bought here.
+   *
+   * Called from inside the checkout transaction, so it rolls back with the
+   * order. Never call it without first calling `findForCheckout` — it does not
+   * check for an existing account, and `users.email` is unique, so a second
+   * call for the same address is a constraint violation rather than a
+   * duplicate.
+   */
+  async createForCheckout(input: {
     email: string
     firstName?: string | null
     lastName?: string | null
     phone?: string | null
   }): Promise<string> {
     const email = input.email.trim().toLowerCase()
-
-    const existing = await usersService.getByEmail(email)
-    if (existing) return existing.id
 
     const created = await usersService.create({
       email,

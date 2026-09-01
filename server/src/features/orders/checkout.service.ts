@@ -64,33 +64,40 @@ export const checkoutService = {
     /**
      * A guest becomes a customer here, before anything is priced or reserved.
      *
-     * This is the only line that makes it happen, and it is placed here rather
-     * than inside `ordersService.checkout` on purpose: resolving the id *first*
-     * means everything downstream — `assertCanOrder`, per-customer discount
-     * limits, the cash-on-delivery open-order cap, the order's `customer_id`,
-     * and the `recordPurchase` that follows payment — sees a real customer
-     * with no further change. Guest checkout was previously a way around every
-     * one of those per-customer rules; it no longer is.
+     * In two halves, deliberately. The **lookup** runs here, before pricing, so
+     * that everything downstream — `assertCanOrder`, per-customer discount
+     * limits, the cash-on-delivery open-order cap — recognises a returning
+     * guest and applies to them. Guest checkout was previously a way around
+     * every one of those rules; it no longer is. The **creation** runs inside
+     * the order's transaction, so a checkout that fails validation leaves no
+     * customer who never bought anything.
      *
      * `placeDraft` deliberately does not do this. A staff member who left the
      * customer field empty on a draft meant to.
      */
-    // Captured before the line below, which is the whole point: after it,
-    // `customerId` is set for everybody and can no longer answer this.
+    // Captured first, because after the lookup below `customerId` is set for
+    // returning guests too and can no longer answer "did they authenticate".
     const signedIn = context.customerId !== null
 
-    const customerId =
-      context.customerId ??
-      (await customersService.ensureForCheckout({
-        email: input.email,
-        firstName: input.shippingAddress.firstName,
-        lastName: input.shippingAddress.lastName,
-        phone: input.phone ?? input.shippingAddress.phone ?? null,
-      }))
+    // A *lookup*, not a write. A returning guest is recognised here, before
+    // anything is priced, so every per-customer rule — their open COD orders,
+    // codes they have already used, whether the shop has disabled them —
+    // applies to them exactly as it would to a signed-in customer.
+    const customerId = context.customerId ?? (await customersService.findForCheckout(input.email))
 
     return ordersService.checkout(input, {
       ...context,
       customerId,
+      // And the write, deferred: `ordersService` calls this inside the order's
+      // transaction and only for a first-time email, so an abandoned checkout
+      // leaves nothing behind. See the hook's own note.
+      ensureCustomer: () =>
+        customersService.createForCheckout({
+          email: input.email,
+          firstName: input.shippingAddress.firstName,
+          lastName: input.shippingAddress.lastName,
+          phone: input.phone ?? input.shippingAddress.phone ?? null,
+        }),
       quoteShipping: (args) => shippingService.rateForCheckout(args),
       applyDiscount: (args) => discountsService.quote({ ...args, signedIn }),
       redeemDiscount: (args) => discountsService.redeem(args),

@@ -183,6 +183,21 @@ export const ordersService = {
         customerId: string | null
         requiresShipping: boolean
       }) => Promise<{ key: string; feeCents: number }>
+      /**
+       * Creates the customer record for a first-time guest, called *inside*
+       * the checkout transaction and only once everything else has passed.
+       *
+       * That placement is the whole point. Creating the record up front meant
+       * every abandoned checkout — a missing delivery option, an expired code,
+       * a basket that went out of stock while they typed — left a customer
+       * behind who had never bought anything. In here it rolls back with the
+       * order, so a customer record means an order exists.
+       *
+       * Only called when `customerId` is still null: a returning guest was
+       * already recognised by email before any of the per-customer rules ran,
+       * which is what lets those rules apply to them.
+       */
+      ensureCustomer?: () => Promise<string>
     },
   ): Promise<OrderDetail> {
     const settings = await settingsService.get()
@@ -215,8 +230,19 @@ export const ordersService = {
         `Some items are no longer available — ${problems.join('; ')}`,
       )
     }
-    if (context.customerId) {
-      await customersService.assertCanOrder(await customersService.getById(context.customerId))
+    /**
+     * Who is buying.
+     *
+     * Starts as whoever the caller identified — a signed-in shopper, or a
+     * returning guest the storefront recognised by email — and stays null for
+     * a first-time guest until `ensureCustomer` runs inside the transaction
+     * below. Everything from here on reads this rather than `context`, so the
+     * order is written against whoever it ends up belonging to.
+     */
+    let customerId = context.customerId
+
+    if (customerId) {
+      await customersService.assertCanOrder(await customersService.getById(customerId))
     }
 
     const subtotal = cart.totals.subtotal.amount
@@ -229,7 +255,7 @@ export const ordersService = {
       discount = await context.applyDiscount({
         code: input.discountCode,
         subtotalCents: subtotal,
-        customerId: context.customerId,
+        customerId: customerId,
         // The basket itself, so a product- or category-scoped code discounts
         // only the lines it actually covers.
         lines: cart.lines.map((line) => ({
@@ -263,7 +289,7 @@ export const ordersService = {
           method: input.paymentMethod,
           subtotalCents: subtotal,
           countryCode: input.shippingAddress.countryCode,
-          customerId: context.customerId,
+          customerId: customerId,
           requiresShipping: needsShipping,
         })
       : { key: input.paymentMethod, feeCents: 0 }
@@ -274,10 +300,17 @@ export const ordersService = {
     const orderNumber = await repo.nextOrderNumber(settings.orderNumberPrefix)
 
     await withTransaction(async () => {
+      // A first-time guest becomes a customer here and nowhere else. Inside
+      // the transaction, so an order that fails to commit leaves no orphan
+      // record; and before the insert, because the order references it.
+      if (!customerId && context.ensureCustomer) {
+        customerId = await context.ensureCustomer()
+      }
+
       const order = await repo.create({
         id: orderId,
         orderNumber,
-        customerId: context.customerId,
+        customerId,
         email: input.email.toLowerCase(),
         phone: input.phone ?? null,
         currency: cart.cart.currency,
@@ -379,7 +412,7 @@ export const ordersService = {
           await context.redeemDiscount({
             discountId: discount.discountId,
             orderId,
-            customerId: context.customerId,
+            customerId: customerId,
             amountCents: discountTotal,
           })
         }
@@ -390,7 +423,7 @@ export const ordersService = {
         field: 'status',
         fromValue: null,
         toValue: 'pending',
-        actorUserId: context.customerId,
+        actorUserId: customerId,
         actorType: context.source === 'admin' ? 'staff' : 'customer',
       })
 
@@ -402,13 +435,13 @@ export const ordersService = {
         {
           orderId,
           orderNumber,
-          customerId: context.customerId,
+          customerId: customerId,
           email: order.email,
           totalCents: total,
           currency: order.currency,
           itemCount: cart.totals.itemCount,
         },
-        { aggregateId: orderId, actorUserId: context.customerId ?? undefined },
+        { aggregateId: orderId, actorUserId: customerId ?? undefined },
       )
     })
 

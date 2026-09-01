@@ -825,6 +825,15 @@ what makes *Total spent* and *Orders* mean what they say.
 **Marketing consent is never set this way.** Typing an email to get a receipt is
 not a subscription. Everyone created at checkout starts at *Not subscribed*.
 
+**Abandoned checkouts leave nothing.** The record is written as the order is,
+so somebody who reaches the payment step and gives up does not appear. A person
+in this list has bought something.
+
+**Orders placed before this existed were backfilled.** Migration 0029 gave every
+historical guest order the customer it would get today, by the same three rules,
+and recomputed *Total spent*, *Orders* and the first/last order dates for
+everyone. Nothing was repriced and no order changed except to gain a customer.
+
 > **One consequence worth knowing.** Because checkout now recognises people by
 > email, a customer you have **disabled** can no longer place an order by simply
 > not signing in. Their checkout is refused the same way it would be if they
