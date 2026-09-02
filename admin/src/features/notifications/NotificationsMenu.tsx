@@ -108,7 +108,7 @@ export function NotificationsMenu() {
         >
           <Bell className="size-4.5" />
           {count > 0 ? (
-            <span className="bg-danger tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.625rem] font-semibold text-white">
+            <span className="bg-danger tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.625rem] font-semibold text-white dark:text-black">
               {count > 99 ? '99+' : count}
             </span>
           ) : null}
