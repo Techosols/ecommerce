@@ -30,6 +30,20 @@ export interface StoreSettings {
   /** Unpaid COD orders one customer may hold at once. NULL means no limit. */
   codMaxOpenOrders: number | null
 
+  // ── Bank transfer (§5.7) ──────────────────────────────────────────────────
+  //
+  // Where the money is sent, and whether the method is on offer at all. The
+  // database refuses `bankTransferEnabled` without an account to name, so the
+  // storefront can render this panel without checking whether it is complete.
+  bankTransferEnabled: boolean
+  bankAccountName: string | null
+  bankName: string | null
+  bankAccountNumber: string | null
+  bankIban: string | null
+  bankSwift: string | null
+  /** Free text shown beneath the account. Displayed, never parsed. */
+  bankInstructions: string | null
+
   /**
    * How long a *placed order* holds its stock. Distinct from
    * `reservationTtlMinutes`, which is a cart hold: an hour is right for a
@@ -68,4 +82,28 @@ export interface PublicStoreSettings {
    * is publishing exactly what to stay under.
    */
   codEnabled: boolean
+  /**
+   * Whether bank transfer is on offer. Only the switch — the account itself is
+   * served with the order that is to be paid, not from a public endpoint. A
+   * shopper who has not bought anything has no reason to be handed the shop's
+   * account number, and a payment page that quotes an order number alongside
+   * the account is the one that gets reconciled.
+   */
+  bankTransferEnabled: boolean
+}
+
+/**
+ * Where to send the money, shown on an unpaid bank-transfer order.
+ *
+ * Assembled only for the customer who holds that order. Every field is the
+ * shop's own published detail — there is nothing here a shop would not print on
+ * an invoice — but it is still scoped to an order rather than broadcast.
+ */
+export interface BankTransferDetails {
+  accountName: string
+  bankName: string
+  accountNumber: string | null
+  iban: string | null
+  swift: string | null
+  instructions: string | null
 }

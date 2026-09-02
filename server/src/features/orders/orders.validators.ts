@@ -43,8 +43,14 @@ export const checkoutAddressSchema = z.strictObject({
  * arrived some other way, and offering it here would be a "mark my own order
  * paid" button. Adding a gateway later means adding its key here and to the
  * registry — the two places that decide what a customer may choose.
+ *
+ * Being named here is necessary but not sufficient. Whether a method is
+ * actually on offer is the registry's `enabled` and `eligibility`, evaluated
+ * against the store's settings and this basket — so `bank_transfer` appearing
+ * in this list is what lets a customer *say* it, and the settings switch is
+ * what decides whether they are allowed to.
  */
-export const selectablePaymentMethod = z.enum(['cod'])
+export const selectablePaymentMethod = z.enum(['cod', 'bank_transfer'])
 
 export const checkoutSchema = z.strictObject({
   email: emailField,

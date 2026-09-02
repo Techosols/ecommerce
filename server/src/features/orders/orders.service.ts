@@ -476,6 +476,23 @@ export const ordersService = {
     return this.detail(order.id)
   },
 
+  /**
+   * A customer's own order, found by its number rather than its id.
+   *
+   * For the payment pages, where the number is what the customer has in front
+   * of them. Scoped by ownership, so a registered customer reaches exactly
+   * their own orders and a guessed number belonging to somebody else is simply
+   * not found — the same rule as `detailForCustomer`, keyed differently.
+   */
+  async findByNumberForCustomer(
+    orderNumber: string,
+    customerId: string,
+  ): Promise<OrderDetail | undefined> {
+    const order = await repo.findByNumber(orderNumber)
+    if (!order || order.customerId !== customerId) return undefined
+    return this.detail(order.id)
+  },
+
   /** Scoped read: a customer's own order, or nothing. */
   async detailForCustomer(orderId: string, customerId: string): Promise<OrderDetail> {
     const order = await repo.findById(orderId)

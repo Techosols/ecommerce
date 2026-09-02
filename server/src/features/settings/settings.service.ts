@@ -15,7 +15,7 @@ import type { Actor } from '../../shared/auth/actor.js'
 import { ValidationError } from '../../shared/errors/index.js'
 import { auditService, diffChanged } from '../audit/index.js'
 import { settingsRepository } from './settings.repository.js'
-import type { PublicStoreSettings, StoreSettings, StoreSettingsUpdate } from './settings.types.js'
+import type { BankTransferDetails, PublicStoreSettings, StoreSettings, StoreSettingsUpdate } from './settings.types.js'
 
 const log = createLogger('settings.service')
 
@@ -95,6 +95,27 @@ export const settingsService = {
       // whether to show the option. The thresholds and the abuse controls
       // behind it stay private (§23.1).
       codEnabled: settings.codEnabled,
+      bankTransferEnabled: settings.bankTransferEnabled,
+    }
+  },
+
+  /**
+   * The account an unpaid bank-transfer order should be paid into.
+   *
+   * Returns null when the method is off. The database CHECK guarantees that an
+   * enabled method has a name, a bank and at least one of account number or
+   * IBAN, so a caller that gets a value gets a usable one — there is no
+   * half-filled panel to render around.
+   */
+  bankDetails(settings: StoreSettings): BankTransferDetails | null {
+    if (!settings.bankTransferEnabled) return null
+    return {
+      accountName: settings.bankAccountName ?? '',
+      bankName: settings.bankName ?? '',
+      accountNumber: settings.bankAccountNumber,
+      iban: settings.bankIban,
+      swift: settings.bankSwift,
+      instructions: settings.bankInstructions,
     }
   },
 

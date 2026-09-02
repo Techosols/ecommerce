@@ -40,6 +40,8 @@ import { cartsStorefrontRoutes } from './features/carts/carts.routes.js'
 import { cartsAdminRoutes } from './features/carts/carts.admin.routes.js'
 import { ordersStorefrontRoutes } from './features/orders/orders.routes.js'
 import { ordersAdminRoutes } from './features/orders/orders.admin.routes.js'
+import { paymentsAdminRoutes } from './features/payments/payments.admin.routes.js'
+import { proofsStorefrontRoutes } from './features/payments/proofs.routes.js'
 import { returnsStorefrontRoutes } from './features/returns/returns.routes.js'
 import { returnsAdminRoutes } from './features/returns/returns.admin.routes.js'
 import { shippingStorefrontRoutes } from './features/shipping/shipping.routes.js'
@@ -78,6 +80,7 @@ storefrontRouter.use(analyticsStorefrontRoutes)
 storefrontRouter.use(cartsStorefrontRoutes)
 storefrontRouter.use(discountsStorefrontRoutes)
 storefrontRouter.use(ordersStorefrontRoutes)
+storefrontRouter.use(proofsStorefrontRoutes)
 storefrontRouter.use(returnsStorefrontRoutes)
 // Account, address book and notifications: every route scoped to the Actor, and
 // there is deliberately no `/customers/:id` on this surface at all.
@@ -98,6 +101,7 @@ adminRouter.use(catalogueAdminRoutes)
 adminRouter.use(inventoryAdminRoutes)
 adminRouter.use(customersAdminRoutes)
 adminRouter.use(ordersAdminRoutes)
+adminRouter.use(paymentsAdminRoutes)
 adminRouter.use(cartsAdminRoutes)
 adminRouter.use(returnsAdminRoutes)
 adminRouter.use(shippingAdminRoutes)

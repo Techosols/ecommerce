@@ -179,22 +179,35 @@ const manual: PaymentMethodDefinition = {
 }
 
 /**
- * Bank transfer and card are declared but switched off.
+ * Bank transfer, settled by hand.
  *
- * They are here rather than absent so that the shape of a second and third
- * method is visible now, while COD is the only one in use — and so the day one
- * of them is turned on, the work is implementing its settlement, not
- * discovering every place that assumed there was only ever one method.
+ * The customer moves the money in their own banking app and comes back with a
+ * screenshot; a member of staff compares it against the shop's statement and
+ * approves it. The order stays `pending` and unpaid in between, holding its
+ * stock, and becomes confirmed the moment a proof is approved — through the
+ * ordinary payments path, not a special one.
+ *
+ * `before_delivery` is the honest settlement model: the money is meant to
+ * arrive first. That does mean the unpaid-order sweep would otherwise cancel
+ * these orders while somebody is still waiting to be reviewed, which is why the
+ * sweep now leaves alone any order with a proof awaiting review.
+ *
+ * The eligibility rules are one line, deliberately. There is no ceiling, no
+ * country whitelist and no account requirement, because none of the ways COD
+ * loses money apply here: nothing ships until a human has agreed the money
+ * arrived. The only question is whether the shop has an account to be paid
+ * into, and the database will not let the switch be on without one.
  */
 const bankTransfer: PaymentMethodDefinition = {
   key: 'bank_transfer',
   label: 'Bank transfer',
-  description: 'Transfer the total to the store’s account before dispatch.',
+  description: 'Transfer the total to our account and send us the receipt.',
   settlement: 'before_delivery',
-  selectableAtCheckout: false,
-  enabled: () => false,
+  selectableAtCheckout: true,
+  enabled: (settings) => settings.bankTransferEnabled,
   feeCents: () => 0,
-  eligibility: () => no('Bank transfer is not available yet'),
+  eligibility: (context) =>
+    context.settings.bankTransferEnabled ? eligible : no('Bank transfer is not available'),
 }
 
 const card: PaymentMethodDefinition = {

@@ -52,6 +52,20 @@ export const updateSettingsSchema = z
     codCountryCodes: z.array(countryCodeField).max(250),
     codRequiresAccount: z.boolean(),
     codMaxOpenOrders: z.number().int().min(1).max(1000).nullable(),
+
+    // Bank transfer. The rule that matters — enabled implies an account to pay
+    // into — is a database CHECK for the same reason the COD range is: a patch
+    // may set the switch alone, and only the database sees both the old and the
+    // new value. A 422 from here would need the current row to be right, and
+    // would still be racing another patch.
+    bankTransferEnabled: z.boolean(),
+    bankAccountName: z.string().trim().max(120).nullable(),
+    bankName: z.string().trim().max(120).nullable(),
+    bankAccountNumber: z.string().trim().max(64).nullable(),
+    bankIban: z.string().trim().max(64).nullable(),
+    bankSwift: z.string().trim().max(16).nullable(),
+    bankInstructions: z.string().trim().max(1000).nullable(),
+
     orderReservationHours: z.number().int().min(1).max(2160),
 
     logoMediaId: z.uuid().nullable(),

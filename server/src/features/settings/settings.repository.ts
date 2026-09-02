@@ -29,6 +29,13 @@ interface SettingsRow {
   cod_country_codes: string[]
   cod_requires_account: boolean
   cod_max_open_orders: number | null
+  bank_transfer_enabled: boolean
+  bank_account_name: string | null
+  bank_name: string | null
+  bank_account_number: string | null
+  bank_iban: string | null
+  bank_swift: string | null
+  bank_instructions: string | null
   order_reservation_hours: number
   logo_media_id: string | null
   metadata: Record<string, unknown>
@@ -58,6 +65,13 @@ function toSettings(row: SettingsRow): StoreSettings {
     codCountryCodes: row.cod_country_codes ?? [],
     codRequiresAccount: row.cod_requires_account,
     codMaxOpenOrders: row.cod_max_open_orders,
+    bankTransferEnabled: row.bank_transfer_enabled,
+    bankAccountName: row.bank_account_name,
+    bankName: row.bank_name,
+    bankAccountNumber: row.bank_account_number,
+    bankIban: row.bank_iban,
+    bankSwift: row.bank_swift,
+    bankInstructions: row.bank_instructions,
     orderReservationHours: row.order_reservation_hours,
     logoMediaId: row.logo_media_id,
     metadata: row.metadata,
@@ -88,6 +102,13 @@ const COLUMNS: Record<keyof StoreSettingsUpdate, string> = {
   codCountryCodes: 'cod_country_codes',
   codRequiresAccount: 'cod_requires_account',
   codMaxOpenOrders: 'cod_max_open_orders',
+  bankTransferEnabled: 'bank_transfer_enabled',
+  bankAccountName: 'bank_account_name',
+  bankName: 'bank_name',
+  bankAccountNumber: 'bank_account_number',
+  bankIban: 'bank_iban',
+  bankSwift: 'bank_swift',
+  bankInstructions: 'bank_instructions',
   orderReservationHours: 'order_reservation_hours',
   logoMediaId: 'logo_media_id',
   metadata: 'metadata',

@@ -14,3 +14,6 @@ export type {
   PaymentMethodKey,
   SettlementModel,
 } from './methods.js'
+export { proofsService } from './proofs.service.js'
+export { proofsRepository } from './proofs.repository.js'
+export type { PaymentProof, PaymentProofStatus } from './proofs.types.js'

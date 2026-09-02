@@ -124,6 +124,57 @@ export const paymentsService = {
     return rows.map(toPayment)
   },
 
+  /**
+   * Every payment the shop has taken, across all orders.
+   *
+   * The admin's Payments index. Joined to the order so a row is readable on its
+   * own — a list of amounts with no order numbers beside them is not a page
+   * anybody can use — and filtered on the two things somebody actually narrows
+   * by when reconciling: the method and whether it landed.
+   */
+  async list(filter: {
+    method?: string
+    status?: string
+    limit: number
+    offset: number
+  }): Promise<{ rows: (Payment & { orderNumber: string; orderEmail: string })[]; total: number }> {
+    const params: unknown[] = []
+    const where: string[] = []
+    if (filter.method) {
+      params.push(filter.method)
+      where.push(`p.method = $${params.length}`)
+    }
+    if (filter.status) {
+      params.push(filter.status)
+      where.push(`p.status = $${params.length}`)
+    }
+    const clause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+
+    const rows = await query<PaymentRow & { order_number: string; order_email: string }>(
+      `SELECT p.*, o.order_number, o.email AS order_email
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+         ${clause}
+        ORDER BY p.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, filter.limit, filter.offset],
+      { name: 'payments.list' },
+    )
+    const totalRow = await queryOne<{ count: number }>(
+      `SELECT count(*)::int AS count FROM payments p ${clause}`,
+      params,
+      { name: 'payments.count' },
+    )
+    return {
+      rows: rows.map((row) => ({
+        ...toPayment(row),
+        orderNumber: row.order_number,
+        orderEmail: row.order_email,
+      })),
+      total: totalRow?.count ?? 0,
+    }
+  },
+
   async getById(id: string): Promise<Payment> {
     const row = await queryOne<PaymentRow>(`SELECT * FROM payments WHERE id = $1`, [id], {
       name: 'payments.getById',

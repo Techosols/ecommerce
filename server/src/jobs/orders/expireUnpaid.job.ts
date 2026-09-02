@@ -41,13 +41,27 @@ export async function expireUnpaidOrdersHandler(
   // Prepaid orders where the money never arrived. `payment_method <> 'cod'`
   // matches the partial index, so this reads only the rows it can act on and
   // cannot pick up a COD order even by accident.
+  //
+  // The NOT EXISTS is what keeps bank transfer usable. Such an order is
+  // `pending` and unpaid by definition until a human has looked at the
+  // screenshot, which is exactly the shape this sweep cancels — so without
+  // this, a customer who paid on Friday evening would find their order
+  // cancelled before anyone opened the queue on Monday. A receipt awaiting
+  // review is somebody waiting on the shop, not a shop waiting on somebody,
+  // and the clock should not run against them. An order whose receipt was
+  // *rejected* is fair game again: the sweep sees no pending proof and the
+  // window resumes from the order's own age.
   const abandoned = await query<{ id: string; payment_method: string }>(
-    `SELECT id, payment_method FROM orders
-      WHERE status = 'pending'
-        AND payment_status = 'pending'
-        AND payment_method <> 'cod'
-        AND placed_at < now() - ($1 || ' hours')::interval
-      ORDER BY placed_at
+    `SELECT id, payment_method FROM orders o
+      WHERE o.status = 'pending'
+        AND o.payment_status = 'pending'
+        AND o.payment_method <> 'cod'
+        AND o.placed_at < now() - ($1 || ' hours')::interval
+        AND NOT EXISTS (
+          SELECT 1 FROM payment_proofs pp
+           WHERE pp.order_id = o.id AND pp.status = 'submitted'
+        )
+      ORDER BY o.placed_at
       LIMIT $2`,
     [String(payload.afterHours), payload.batchSize],
     { name: 'orders.findAbandonedUnpaid' },

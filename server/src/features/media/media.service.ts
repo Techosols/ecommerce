@@ -69,7 +69,18 @@ export const mediaService = {
     contentType: string
     byteSize: number
     alt?: string
-    actor: Actor
+    /**
+     * Null for an upload nobody is signed in for.
+     *
+     * `media_assets.uploaded_by` has always been nullable; what is new is a
+     * caller that has no actor. A customer sending a payment receipt is not
+     * staff and usually has no account at all, and requiring one would mean
+     * requiring registration in order to pay. The route that allows it does its
+     * own scoping — it is reached only by somebody holding an order number and
+     * the email it was placed with — and every other media route still demands
+     * `catalog:write`.
+     */
+    actor: Actor | null
   }): Promise<UploadTicket> {
     if (!isAllowedImageType(input.contentType)) {
       throw new DomainRuleError(
@@ -96,7 +107,7 @@ export const mediaService = {
       declaredMime: input.contentType,
       originalFilename: sanitiseFilename(input.filename),
       alt: input.alt?.slice(0, 500) ?? null,
-      uploadedBy: input.actor.userId,
+      uploadedBy: input.actor?.userId ?? null,
     })
 
     const upload = await storage.createSignedUploadUrl(key, {
@@ -104,7 +115,7 @@ export const mediaService = {
       expiresInSeconds: env.MEDIA_UPLOAD_URL_TTL_SECONDS,
     })
 
-    log.debug({ assetId: asset.id, key, actorId: input.actor.userId }, 'upload ticket issued')
+    log.debug({ assetId: asset.id, key, actorId: input.actor?.userId ?? null }, 'upload ticket issued')
 
     return {
       assetId: asset.id,
@@ -123,7 +134,7 @@ export const mediaService = {
    * marked `failed` with a reason rather than retried, because retrying will
    * inspect the same bytes and reach the same conclusion.
    */
-  async completeUpload(assetId: string, actor: Actor): Promise<MediaAsset> {
+  async completeUpload(assetId: string, actor: Actor | null): Promise<MediaAsset> {
     const asset = await mediaRepository.findById(assetId)
     if (!asset) throw new NotFoundError('Media asset not found')
 
@@ -185,7 +196,7 @@ export const mediaService = {
     await publish(
       'media.uploaded',
       { mediaAssetId: assetId, mimeType: sniffed, byteSize: info.byteSize },
-      { aggregateId: assetId, actorUserId: actor.userId },
+      { aggregateId: assetId, actorUserId: actor?.userId ?? undefined },
     )
 
     log.info({ assetId, mimeType: sniffed, byteSize: info.byteSize }, 'upload accepted for processing')
