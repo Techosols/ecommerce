@@ -73,8 +73,8 @@ export function Modal({
             {description ? <p className="text-muted mt-1 text-sm">{description}</p> : null}
           </div>
           {dismissible ? (
-            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}>
-              <X className="size-4" />
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" className="hover:bg-gray-300 dark:hover:bg-[#303030]" onClick={onClose}>
+              <X className="size-4 dark:text-white text-black" />
             </Button>
           ) : null}
         </header>

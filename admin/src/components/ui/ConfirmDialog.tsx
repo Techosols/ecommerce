@@ -39,7 +39,7 @@ export function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>
-          <Button variant={tone} onClick={onConfirm} isLoading={isLoading}>
+          <Button variant={tone} onClick={onConfirm} isLoading={isLoading} className="dark:text-white dark:bg-red-500">
             {confirmLabel}
           </Button>
         </>

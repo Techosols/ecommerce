@@ -112,7 +112,7 @@ export function CollectionListPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-danger"
+                          className="hover:text-danger dark:text-red-500 dark:border"
                           leadingIcon={<Trash2 className="size-3.5" />}
                           onClick={() => setArchiving(collection)}
                         >
