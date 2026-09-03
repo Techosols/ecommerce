@@ -97,7 +97,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               aria-label={revealed ? 'Hide password' : 'Show password'}
               onClick={() => setRevealed((value) => !value)}
             >
-              {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {revealed ? <EyeOff className="size-4 dark:text-white" /> : <Eye className="size-4 dark:text-white" />}
             </Button>
           }
         />
