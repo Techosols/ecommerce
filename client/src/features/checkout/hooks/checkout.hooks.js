@@ -42,3 +42,17 @@ export function useOrderLookup() {
     mutationFn: ({ orderNumber, email }) => checkoutApi.lookup(orderNumber, email),
   })
 }
+
+/**
+ * A guest stopping an order nobody has packed yet.
+ *
+ * Scoped by the same order number and email the lookup uses. The server refuses
+ * anything past the point where cancelling is possible and always returns the
+ * stock, so this offers a button and the server decides — the storefront is
+ * never the thing that judges what is too late to stop.
+ */
+export function useCancelGuestOrder() {
+  return useMutation({
+    mutationFn: (claim) => checkoutApi.cancelAsGuest(claim),
+  })
+}

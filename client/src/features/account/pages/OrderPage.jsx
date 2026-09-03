@@ -1,5 +1,5 @@
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
-import { CheckCircle2, Package } from 'lucide-react'
+import { Banknote, CheckCircle2, Package } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
@@ -96,6 +96,15 @@ export function OrderView({ order, justPlaced, actions }) {
         </p>
       ) : null}
 
+      <AwaitingBankTransfer order={order} />
+
+      {order.paymentMethod === 'cod' && order.paymentState === 'awaiting_payment' ? (
+        <p className="border-line text-muted rounded-card border border-dashed px-5 py-4 text-sm">
+          You are paying cash on delivery. Have {formatMoney(order.totals.total)} ready when it
+          arrives — there is nothing to pay now.
+        </p>
+      ) : null}
+
       <section className="border-line bg-surface rounded-card border">
         <h2 className="border-line border-b px-5 py-3 text-base font-semibold">What you ordered</h2>
         <ul className="divide-line divide-y">
@@ -174,6 +183,44 @@ export function OrderView({ order, justPlaced, actions }) {
         Keep shopping
       </Link>
     </div>
+  )
+}
+
+/**
+ * The step the shopper still has to take.
+ *
+ * A bank-transfer order is placed unpaid and stays that way until somebody
+ * sends money and a receipt — and the unpaid sweep will eventually cancel it.
+ * The confirmation is the one moment a guest is guaranteed to be looking, so
+ * this is where the next step has to be, in the strongest terms the page has.
+ *
+ * The link carries the order number and email so the payment page does not ask
+ * for a credential the shopper is already holding.
+ */
+function AwaitingBankTransfer({ order }) {
+  if (order.paymentMethod !== 'bank_transfer') return null
+  if (order.paymentState !== 'awaiting_payment') return null
+  if (order.status === 'cancelled') return null
+
+  return (
+    <section className="border-warn/30 bg-warn-soft rounded-card flex flex-wrap items-center justify-between gap-4 border px-5 py-4">
+      <div className="flex items-start gap-3">
+        <Banknote className="text-warn mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <div>
+          <p className="text-ink font-medium">This order is waiting for your payment</p>
+          <p className="text-muted text-sm">
+            Send {formatMoney(order.totals.total)} to our account, then send us the receipt so we
+            can confirm it.
+          </p>
+        </div>
+      </div>
+      <Link
+        to={`/pay/bank-transfer?order=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(order.email)}`}
+        className="bg-brand-600 hover:bg-brand-700 shadow-card inline-flex h-10 shrink-0 items-center rounded-lg px-4 text-sm text-white"
+      >
+        Pay now
+      </Link>
+    </section>
   )
 }
 

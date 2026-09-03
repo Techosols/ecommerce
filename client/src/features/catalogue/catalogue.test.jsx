@@ -313,6 +313,23 @@ describe('CollectionPage', () => {
     expect(screen.getByText('What leaves the counter fastest.')).toBeInTheDocument()
   })
 
+  it('renders the description as the HTML the admin wrote', async () => {
+    // Descriptions come out of a rich text editor and are sanitised server
+    // side. Rendering them as text would show a shopper the tags.
+    mock
+      .on('GET', '/storefront/collections/bestsellers', {
+        ...collection(),
+        description: '<p>What sells</p><ul><li>Balm</li></ul>',
+      })
+      .onList('/storefront/products', [productCard()])
+
+    renderPage(<CollectionPage />, route)
+
+    await screen.findByRole('heading', { name: 'Bestsellers' })
+    expect(screen.getByText('What sells').tagName).toBe('P')
+    expect(screen.getByText('Balm').tagName).toBe('LI')
+  })
+
   it('asks the server what is in it rather than filtering on rules here', async () => {
     // A dynamic collection's membership is its rules, evaluated on the server
     // at read time. The storefront must never be told what the rules are, and

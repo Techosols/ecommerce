@@ -1,0 +1,22 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="4px">
+  A payment receipt is waiting for you
+</mj-text>
+
+<mj-text color="#52606d" padding-top="0">
+  {{customerEmail}} says they have sent <strong>{{total}}</strong> for order
+  <strong>{{orderNumber}}</strong>. The order stays unpaid until somebody checks
+  the receipt against the bank statement.
+</mj-text>
+
+<mj-text font-weight="600" padding-bottom="2px" padding-top="14px">The customer says</mj-text>
+<mj-text color="#52606d" padding-top="0">
+  Sent by {{claimedSenderName}}<br />
+  Bank {{claimedSenderBank}}{{#if claimedAccountLast4}}<br />
+  Account ending •••• {{claimedAccountLast4}}{{/if}}
+</mj-text>
+
+<mj-text color="#9aa5b1" font-size="12px" padding-top="10px">
+  Unverified — typed by the customer, for you to match against your statement.
+</mj-text>
+
+<mj-button href="{{reviewUrl}}" padding-top="20px">Review the receipt</mj-button>

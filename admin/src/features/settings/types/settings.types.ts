@@ -39,6 +39,23 @@ export interface StoreSettings {
   codRequiresAccount: boolean
   codMaxOpenOrders: number | null
 
+  // ── Bank transfer ─────────────────────────────────────────────────────────
+  bankTransferEnabled: boolean
+  bankAccountName: string | null
+  bankName: string | null
+  bankAccountNumber: string | null
+  bankIban: string | null
+  bankSwift: string | null
+  bankInstructions: string | null
+
+  /**
+   * Staff addresses that receive the shop's own alerts.
+   *
+   * Deliberately not `contactEmail`: that one is printed in customer emails and
+   * receives their replies.
+   */
+  adminNotificationEmails: string[]
+
   /** How long a *placed order* holds stock — not the cart hold. */
   orderReservationHours: number
 
@@ -120,4 +137,47 @@ export interface Session {
   ip: string | null
   createdAt: string
   expiresAt: string
+}
+
+/**
+ * One email the shop can send.
+ *
+ * `alwaysOn` is the server's judgement, not the UI's: password reset going dark
+ * produces no error anywhere, so which mails are load-bearing is decided in one
+ * place and this screen renders what it is told.
+ */
+export type EmailLogStatus =
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'failed'
+  | 'suppressed'
+  | 'disabled'
+
+/**
+ * One message the shop tried to send.
+ *
+ * No body and no props, deliberately — the server does not send them. An
+ * operations screen about *delivery* should not become a second place the
+ * shop's personal data can be read from.
+ */
+export interface EmailLogEntry {
+  id: string
+  to: string
+  template: string
+  subject: string
+  status: EmailLogStatus
+  attempts: number
+  lastError: string | null
+  provider: string | null
+  sentAt: string | null
+  createdAt: string
+}
+
+export interface EmailTemplateSetting {
+  template: string
+  enabled: boolean
+  alwaysOn: boolean
+  alwaysOnReason: string | null
+  updatedAt: string | null
 }

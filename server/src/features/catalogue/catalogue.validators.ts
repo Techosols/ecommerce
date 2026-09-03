@@ -13,6 +13,7 @@
  *     field.** Those move through their own transitions, not through a PATCH.
  */
 import { z } from 'zod'
+import { sanitiseRichText } from '../../shared/validation/richText.js'
 import { slugField } from '../../shared/validation/common.js'
 import { offsetPaginationQuery } from '../../shared/http/pagination.js'
 
@@ -90,11 +91,27 @@ const variantInput = z.strictObject({
   options: z.record(z.string().min(1).max(60), z.string().min(1).max(80)).optional(),
 })
 
+
+/**
+ * A description written in the rich text editor.
+ *
+ * Sanitised by the schema rather than by the route, so a field is made safe by
+ * being *declared* rich text — there is no call anybody can forget to add when
+ * they write the next endpoint. The transform runs after the length check, so a
+ * megabyte of markup is refused rather than sanitised and then refused.
+ */
+function richText(maxLength: number) {
+  return z
+    .string()
+    .max(maxLength)
+    .transform((value) => sanitiseRichText(value) ?? '')
+}
+
 export const createProductSchema = z.strictObject({
   title: titleField,
   handle: handleField.optional(),
   subtitle: z.string().trim().max(300).nullable().optional(),
-  description: z.string().max(20_000).nullable().optional(),
+  description: richText(20_000).nullable().optional(),
   categoryId: z.uuid().nullable().optional(),
   productType: z.string().trim().max(80).nullable().optional(),
   vendor: z.string().trim().max(120).nullable().optional(),
@@ -113,7 +130,7 @@ export const updateProductSchema = z
     title: titleField,
     handle: handleField,
     subtitle: z.string().trim().max(300).nullable(),
-    description: z.string().max(20_000).nullable(),
+    description: richText(20_000).nullable(),
     categoryId: z.uuid().nullable(),
     productType: z.string().trim().max(80).nullable(),
     vendor: z.string().trim().max(120).nullable(),
@@ -208,7 +225,7 @@ export const createCategorySchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
   handle: handleField.optional(),
   parentId: z.uuid().nullable().optional(),
-  description: z.string().trim().max(2_000).nullable().optional(),
+  description: richText(2_000).nullable().optional(),
   imageId: z.uuid().nullable().optional(),
   position: z.number().int().min(0).max(10_000).optional(),
 })
@@ -218,7 +235,7 @@ export const updateCategorySchema = z
     name: z.string().trim().min(1).max(120),
     handle: handleField,
     parentId: z.uuid().nullable(),
-    description: z.string().trim().max(2_000).nullable(),
+    description: richText(2_000).nullable(),
     imageId: z.uuid().nullable(),
     position: z.number().int().min(0).max(10_000),
     isActive: z.boolean(),
@@ -250,7 +267,7 @@ export const createCollectionSchema = z.strictObject({
   rules: collectionRulesSchema.optional(),
   title: titleField,
   handle: handleField.optional(),
-  description: z.string().trim().max(2_000).nullable().optional(),
+  description: richText(2_000).nullable().optional(),
   imageId: z.uuid().nullable().optional(),
   position: z.number().int().min(0).max(10_000).optional(),
   seoTitle: z.string().trim().max(200).nullable().optional(),
@@ -262,7 +279,7 @@ export const updateCollectionSchema = z
   .strictObject({
     title: titleField,
     handle: handleField,
-    description: z.string().trim().max(2_000).nullable(),
+    description: richText(2_000).nullable(),
     imageId: z.uuid().nullable(),
     position: z.number().int().min(0).max(10_000),
     isActive: z.boolean(),

@@ -6,7 +6,11 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
 import { messageOf } from '@/lib/api'
 import { formatMoney, plural } from '@/lib/format'
+import { EVENTS, track } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { useCart } from '@/features/cart/hooks/cart.hooks'
+import { useAuth } from '@/features/account/useAuth'
+import { useStoreSettings } from '@/features/settings/useSettings'
 import { AddressFields } from '../components/AddressFields'
 import { emptyAddress, toAddressPayload, validateAddress } from '../address'
 import { useCheckoutPreview, usePlaceOrder } from '../hooks/checkout.hooks'
@@ -27,12 +31,38 @@ import { useCheckoutPreview, usePlaceOrder } from '../hooks/checkout.hooks'
  */
 export function CheckoutPage() {
   const cart = useCart()
+  const settings = useStoreSettings()
+  const { isSignedIn, isRestoring } = useAuth()
 
-  if (cart.isPending) return <CheckoutSkeleton />
+  // Reaching this page *is* starting checkout. Reported once the basket has
+  // arrived, because a checkout with nothing in it is not one — and keyed on a
+  // constant so re-quoting a delivery option does not start it again.
+  useTrackOnce(EVENTS.CHECKOUT_STARTED, cart.data ? 'checkout' : null, {
+    itemCount: cart.data?.totals?.itemCount,
+    value: cart.data?.totals?.subtotal?.amount,
+  })
+
+  if (cart.isPending || isRestoring) return <CheckoutSkeleton />
 
   // Nothing to check out. Bounce rather than render a form over an empty
   // basket, which would only fail at the end.
   if (cart.data && cart.data.lines.length === 0) return <Navigate to="/cart" replace />
+
+  /**
+   * The shop can require an account to check out.
+   *
+   * The server refuses a guest checkout when that setting is off, so a form
+   * rendered here would collect an address, a delivery choice and a payment
+   * method and then fail at the very last step. Sending them to sign in first
+   * — with the way back recorded — is the same rule enforced early rather than
+   * a different one.
+   *
+   * This is not the security boundary. The server is, and it refuses
+   * regardless of what this page decides to show.
+   */
+  if (settings && settings.guestCheckoutEnabled === false && !isSignedIn) {
+    return <Navigate to="/sign-in?next=/checkout" replace />
+  }
 
   return (
     <QueryBoundary
@@ -122,6 +152,17 @@ function CheckoutForm({ cart }) {
       },
       {
         onSuccess: (order) => {
+          // The one event the orders table cannot supply on its own: it ties
+          // this purchase back to the visit that produced it, which is what
+          // makes the funnel a funnel rather than two unrelated counts.
+          track(EVENTS.CHECKOUT_COMPLETED, {
+            orderId: order.id,
+            value: order.totals?.total?.amount,
+            currency: order.currency,
+            paymentMethod: order.paymentMethod,
+            itemCount: order.items?.length,
+          })
+
           // By id, not by order number: the store's number prefix defaults to
           // "#", and `/orders/#1001` is a fragment, not a path. The order
           // itself is handed over in navigation state, so the confirmation

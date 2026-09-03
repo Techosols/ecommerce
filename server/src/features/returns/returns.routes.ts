@@ -13,11 +13,18 @@ import { created, ok, paginated } from '../../shared/http/respond.js'
 import { buildPaginationMeta, toOffset } from '../../shared/http/pagination.js'
 import { validate, validatedQuery } from '../../shared/middleware/validate.js'
 import { authenticate, requireActor } from '../../shared/middleware/authenticate.js'
+import { ipLimiter } from '../../shared/middleware/rateLimit.js'
 import { NotFoundError } from '../../shared/errors/index.js'
 import { ordersService } from '../orders/index.js'
 import { returnsService } from './returns.service.js'
 import { customerReturnDto, returnCardDto } from './returns.mapper.js'
-import { myReturnListQuery, openReturnSchema, returnIdParam } from './returns.validators.js'
+import {
+  guestOpenReturnSchema,
+  guestOrderClaimSchema,
+  myReturnListQuery,
+  openReturnSchema,
+  returnIdParam,
+} from './returns.validators.js'
 
 export const returnsStorefrontRoutes: ExpressRouter = Router()
 
@@ -30,6 +37,53 @@ export const returnsStorefrontRoutes: ExpressRouter = Router()
  * the catalogue. Per-route is the only placement that guards these routes and
  * only these routes.
  */
+
+/*
+ * ── The same two things, for somebody with no account ──────────────────────
+ *
+ * A guest checkout is most of this shop's orders, and until now a guest who
+ * needed to send something back had no route at all — they had to email. These
+ * two carry the order number and the email it was placed with, resolved through
+ * the same `lookupGuestOrder` the order lookup uses, which matches only orders
+ * with no password on the account. A registered customer's order is therefore
+ * unreachable here whatever number is guessed, and the rate limit is the
+ * lookup's.
+ *
+ * POST for both, including the read: an email address in a query string ends up
+ * in access logs, browser history and the `Referer` of every asset the page
+ * then loads.
+ */
+
+const guestLimiter = ipLimiter({ windowMs: 15 * 60_000, limit: 10 })
+
+/** What a guest can still send back. */
+returnsStorefrontRoutes.post(
+  '/orders/lookup/returnable',
+  guestLimiter,
+  validate({ body: guestOrderClaimSchema }),
+  async (req: Request, res: Response) => {
+    const body = req.body as z.infer<typeof guestOrderClaimSchema>
+    const order = await ordersService.lookupGuestOrder(body.orderNumber, body.email)
+    return ok(res, await returnsService.returnable(order.id))
+  },
+)
+
+returnsStorefrontRoutes.post(
+  '/orders/lookup/returns',
+  guestLimiter,
+  validate({ body: guestOpenReturnSchema }),
+  async (req: Request, res: Response) => {
+    const body = req.body as z.infer<typeof guestOpenReturnSchema>
+    const order = await ordersService.lookupGuestOrder(body.orderNumber, body.email)
+
+    const request = await returnsService.request(
+      order.id,
+      { reason: body.reason, customerNote: body.customerNote ?? null, lines: body.lines },
+      null,
+    )
+    return created(res, customerReturnDto(request))
+  },
+)
 
 returnsStorefrontRoutes.get(
   '/returns',

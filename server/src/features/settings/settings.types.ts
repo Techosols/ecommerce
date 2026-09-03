@@ -45,6 +45,15 @@ export interface StoreSettings {
   bankInstructions: string | null
 
   /**
+   * Staff addresses that receive the shop's own alerts.
+   *
+   * Deliberately not `contactEmail`: that one is printed in customer emails and
+   * receives their replies, and alerts landing in the same inbox as "where is
+   * my order" is how alerts stop being read. Empty means nobody is told.
+   */
+  adminNotificationEmails: string[]
+
+  /**
    * How long a *placed order* holds its stock. Distinct from
    * `reservationTtlMinutes`, which is a cart hold: an hour is right for a
    * basket, and disastrous for an order. Must exceed the unpaid-order sweep

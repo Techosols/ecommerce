@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
 import { ProductCard, ProductCardSkeleton } from '../components/ProductCard'
 import { ListingControls } from '../components/ListingControls'
+import { EVENTS } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { useProducts } from '../hooks/catalogue.hooks'
 
 const PER_PAGE = 12
@@ -47,6 +49,14 @@ export function ProductListPage() {
     ...(minPrice ? { minPrice } : {}),
     ...(maxPrice ? { maxPrice } : {}),
     ...(inStock ? { inStock: 'true' } : {}),
+  })
+
+  // Keyed on the term alone, so paging through results is not counted as
+  // searching again — and not counted at all while browsing with no term, or
+  // before the answer has come back.
+  useTrackOnce(EVENTS.SEARCH_PERFORMED, q && query.data ? q : null, {
+    term: q,
+    results: query.data?.pagination?.total,
   })
 
   function setPage(next) {

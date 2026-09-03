@@ -200,6 +200,48 @@ proofsStorefrontRoutes.post(
   },
 )
 
+/**
+ * Step 4: has the image finished processing?
+ *
+ * `submit` below refuses an asset that is not `ready`, and processing happens
+ * in a background job — so without this the storefront's only way to find out
+ * is to keep trying to submit and read the refusal, against a limiter that
+ * allows two whole attempts. The admin uploader polls `GET /admin/media/:id`
+ * for exactly this; this is the same question asked with the credential the
+ * customer actually has.
+ *
+ * It answers about one asset, for somebody who has already proved they hold the
+ * order, and says only what the customer can act on: whether to wait, to
+ * submit, or to pick a different file. `failureReason` is the server's own
+ * words — "file content is not a recognised image" — which beats anything the
+ * page could invent from a status alone.
+ *
+ * Its own limiter, deliberately. Polling shares nothing with `claimLimiter`,
+ * because a page checking every second must not be able to spend the budget
+ * that the submission itself needs.
+ */
+proofsStorefrontRoutes.post(
+  '/payments/bank-transfer/uploads/status',
+  authenticateOptional(),
+  ipLimiter({ windowMs: 15 * 60_000, limit: 120 }),
+  validate({ body: completeUploadSchema }),
+  async (req: Request, res: Response) => {
+    const body = req.body as z.infer<typeof completeUploadSchema>
+    await orderFromClaim(req, body.orderNumber, body.email)
+
+    const asset = await mediaService.getById(body.assetId)
+    // A 404 rather than a status for an id that is not an asset, so this cannot
+    // be used to test whether an arbitrary uuid exists.
+    if (!asset) throw new NotFoundError('No upload matches that id')
+
+    return ok(res, {
+      id: asset.id,
+      status: asset.status,
+      failureReason: asset.status === 'failed' ? asset.failureReason : null,
+    })
+  },
+)
+
 /** "Here is the receipt." */
 proofsStorefrontRoutes.post(
   '/payments/bank-transfer/proofs',
@@ -221,6 +263,10 @@ proofsStorefrontRoutes.post(
       },
       {
         id: order.id,
+        orderNumber: order.orderNumber,
+        email: order.email,
+        totalCents: order.totalCents,
+        currency: order.currency,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         status: order.status,

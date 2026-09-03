@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
 import { formatMoney, plural } from '@/lib/format'
 import { messageOf } from '@/lib/api'
+import { EVENTS } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { useCart, useRemoveFromCart, useSetCartQuantity } from '../hooks/cart.hooks'
 
 /**
@@ -22,6 +24,13 @@ import { useCart, useRemoveFromCart, useSetCartQuantity } from '../hooks/cart.ho
  */
 export function CartPage() {
   const query = useCart()
+
+  // Once per visit to the basket, not once per quantity change: keyed on a
+  // constant so editing a line does not report a second view.
+  useTrackOnce(EVENTS.CART_VIEWED, query.data ? 'cart' : null, {
+    itemCount: query.data?.totals?.itemCount,
+    value: query.data?.totals?.subtotal?.amount,
+  })
 
   return (
     <div className="flex flex-col gap-8">

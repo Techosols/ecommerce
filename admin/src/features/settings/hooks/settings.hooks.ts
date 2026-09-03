@@ -43,6 +43,61 @@ export function useUpdateStoreSettings() {
 
 // ── Staff and roles ─────────────────────────────────────────────────────────
 
+export function useEmailTemplates() {
+  return useQuery({
+    queryKey: ['settings', 'emails'],
+    queryFn: () => settingsApi.emailTemplates(),
+  })
+}
+
+/**
+ * The mail log.
+ *
+ * `staleTime: 0` and a short refetch: somebody is looking at this screen
+ * precisely because a message is in flight or stuck, and a cached answer from
+ * two minutes ago is the one thing that cannot help them.
+ */
+export function useEmailLog(params: { page?: number; status?: string; to?: string } = {}) {
+  return useQuery({
+    queryKey: ['settings', 'email-log', params],
+    queryFn: () => settingsApi.emailLog({ ...params, limit: 20 }),
+    placeholderData: (previous) => previous,
+    staleTime: 0,
+  })
+}
+
+export function useSendTestEmail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (to: string) => settingsApi.sendTestEmail(to),
+    onSuccess: () => {
+      // The log is where the answer actually appears, so bring it up to date.
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'email-log'] })
+    },
+  })
+}
+
+export function useRetryEmail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => settingsApi.retryEmail(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'email-log'] })
+    },
+  })
+}
+
+export function useSetEmailTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ template, enabled }: { template: string; enabled: boolean }) =>
+      settingsApi.setEmailTemplate(template, enabled),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'emails'] })
+    },
+  })
+}
+
 export function useStaff(params: { page?: number; limit?: number } = {}) {
   const { can } = useAuth()
   return useQuery({

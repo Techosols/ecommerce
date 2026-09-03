@@ -24,6 +24,7 @@
  * is the same key the shop already trusts to show somebody their own order.
  */
 import { v7 as uuidv7 } from 'uuid'
+import { publish } from '../../events/index.js'
 import { createLogger } from '../../infrastructure/logging/logger.js'
 import { withTransaction } from '../../infrastructure/database/transaction.js'
 import type { Actor } from '../../shared/auth/actor.js'
@@ -83,6 +84,10 @@ export const proofsService = {
     input: SubmitProofInput,
     order: {
       id: string
+      orderNumber: string
+      email: string
+      totalCents: number
+      currency: string
       paymentMethod: string
       paymentStatus: string
       status: string
@@ -135,6 +140,30 @@ export const proofsService = {
       accountLast4: input.accountLast4?.trim() || null,
       submittedBy: input.submittedBy ?? null,
     })
+
+    /**
+     * Announced rather than emailed from here.
+     *
+     * Who hears about a waiting receipt — staff by email, a badge in the admin,
+     * something else next year — is not this service's business. It publishes
+     * the fact and the subscribers decide, which is the same shape every other
+     * feature-driven email in this system has (§12.3).
+     */
+    await publish(
+      'payment.proof_submitted',
+      {
+        proofId: proof.id,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        email: order.email,
+        totalCents: order.totalCents,
+        currency: order.currency,
+        claimedSenderName: proof.senderName,
+        claimedSenderBank: proof.senderBank,
+        claimedAccountLast4: proof.accountLast4,
+      },
+      { aggregateId: order.id, ...(input.submittedBy ? { actorUserId: input.submittedBy } : {}) },
+    )
 
     log.info({ proofId: proof.id, orderId: order.id }, 'payment proof submitted')
     return proof

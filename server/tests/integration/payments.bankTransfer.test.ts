@@ -302,6 +302,47 @@ describeIfDatabase('bank transfer', () => {
       expect(res.body.message).toMatch(/has not finished uploading/i)
     })
 
+    it('tells the customer when the receipt image is ready to submit', async () => {
+      // Without this the page has no way to know: processing is a background
+      // job and `submit` refuses anything that is not `ready`, so the only
+      // alternative is to keep trying to submit and read the refusal — against
+      // a limiter that allows two whole attempts.
+      const order = await bankOrder()
+      const ticket = await request(app)
+        .post('/api/v1/storefront/payments/bank-transfer/uploads')
+        .send({ ...claim(order), contentType: 'image/jpeg', byteSize: 2048 })
+      await storage.completeUpload(ticket.body.data.upload.token, await makeJpeg(), 'image/jpeg')
+      const assetId = ticket.body.data.assetId as string
+
+      await request(app)
+        .post('/api/v1/storefront/payments/bank-transfer/uploads/complete')
+        .send({ ...claim(order), assetId })
+
+      const waiting = await request(app)
+        .post('/api/v1/storefront/payments/bank-transfer/uploads/status')
+        .send({ ...claim(order), assetId })
+      expect(waiting.status).toBe(200)
+      expect(waiting.body.data.status).toBe('processing')
+
+      await processImageHandler({ mediaAssetId: assetId }, jobContext())
+
+      const ready = await request(app)
+        .post('/api/v1/storefront/payments/bank-transfer/uploads/status')
+        .send({ ...claim(order), assetId })
+      expect(ready.body.data.status).toBe('ready')
+      expect(ready.body.data.failureReason).toBeNull()
+    })
+
+    it('will not report on an upload without a claim to an order', async () => {
+      const order = await bankOrder()
+      const assetId = await uploadReceipt(order)
+
+      const res = await request(app)
+        .post('/api/v1/storefront/payments/bank-transfer/uploads/status')
+        .send({ orderNumber: order.orderNumber, email: 'somebody@else.test', assetId })
+      expect(res.status).toBe(404)
+    })
+
     it('does not let one order’s claim upload against another', async () => {
       const mine = await bankOrder('mine@example.test')
       const theirs = await bankOrder('theirs@example.test')

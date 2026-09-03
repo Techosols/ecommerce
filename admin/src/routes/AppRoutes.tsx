@@ -5,7 +5,8 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
-import { AnalyticsPage, PaymentsPage } from '@/pages/placeholders'
+import { AnalyticsPage } from '@/pages/placeholders'
+import { PaymentsPage } from '@/features/payments'
 import { CartDetailPage } from '@/features/checkout/pages/CartDetailPage'
 import { CartListPage } from '@/features/checkout/pages/CartListPage'
 import { CheckoutAttemptsPage } from '@/features/checkout/pages/CheckoutAttemptsPage'
@@ -14,6 +15,7 @@ import { DiscountDetailPage } from '@/features/discounts/pages/DiscountDetailPag
 import { DiscountListPage } from '@/features/discounts/pages/DiscountListPage'
 import { AccountPage } from '@/features/settings/pages/AccountPage'
 import { AuditLogPage } from '@/features/settings/pages/AuditLogPage'
+import { EmailsPage } from '@/features/settings/pages/EmailsPage'
 import { SettingsLayout } from '@/features/settings/pages/SettingsLayout'
 import { StaffPage } from '@/features/settings/pages/StaffPage'
 import { StoreSettingsPage } from '@/features/settings/pages/StoreSettingsPage'
@@ -131,6 +133,7 @@ export function AppRoutes() {
           <Route element={<SettingsLayout />}>
             <Route element={<ProtectedRoute permission="settings:read" />}>
               <Route path="/settings" element={<StoreSettingsPage />} />
+              <Route path="/settings/emails" element={<EmailsPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="staff:read" />}>
               <Route path="/settings/staff" element={<StaffPage />} />

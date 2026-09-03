@@ -56,6 +56,46 @@ function adminOrderUrl(orderId: string): string {
   return `${env.CLIENT_ORIGIN}/admin/orders/${orderId}`
 }
 
+/** One address, on one line, the way a person reads one off a screen. */
+function oneLineAddress(address: {
+  firstName: string
+  lastName: string
+  line1: string
+  line2: string | null
+  city: string
+  postalCode: string | null
+  countryCode: string
+} | undefined): string {
+  if (!address) return '—'
+  return [
+    `${address.firstName} ${address.lastName}`,
+    address.line1,
+    address.line2,
+    address.city,
+    address.postalCode,
+    address.countryCode,
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
+
+/**
+ * Emails the shop's own staff, if anybody is listed.
+ *
+ * One address per message rather than one message to many, so a bounce from the
+ * warehouse address does not take the accountant's copy with it, and so the
+ * dedupe key stays per-recipient. Nobody listed is a valid configuration and
+ * means exactly what it says — no alerts.
+ */
+async function notifyStaffByEmail<T extends Parameters<typeof emailService.enqueue>[0]>(
+  build: (to: string) => T,
+): Promise<void> {
+  const settings = await settingsService.get()
+  for (const to of settings.adminNotificationEmails) {
+    await emailService.enqueue(build(to))
+  }
+}
+
 async function firstNameFor(userId: string | null): Promise<string | undefined> {
   if (!userId) return undefined
   const user = await usersService.getById(userId)
@@ -162,6 +202,99 @@ export function registerOrderSubscribers(): void {
         totalCents: order.totalCents,
         currency: order.currency,
       })
+
+      /**
+       * And the same news by email, for whoever is not looking at the console.
+       *
+       * A fuller message than the customer's: it carries the payment method and
+       * whether the money has actually arrived, which is the difference between
+       * "pack this" and "wait". `actionNeeded` says so in one line at the top,
+       * because an unpaid order that looks like a paid one is how something
+       * ships for free.
+       */
+      const billing = order.addresses.find((address) => address.type === 'billing')
+      const paid = order.paymentStatus === 'paid'
+      await notifyStaffByEmail((to) => ({
+        to,
+        template: 'admin-order-placed' as const,
+        props: {
+          storeName: settings.storeName,
+          orderNumber: order.orderNumber,
+          placedAt: order.placedAt.toISOString().slice(0, 16).replace('T', ' '),
+          customerEmail: order.email,
+          ...(order.phone ? { customerPhone: order.phone } : {}),
+          ...(shipping ? { customerName: `${shipping.firstName} ${shipping.lastName}` } : {}),
+          items: order.items.map((item) => ({
+            title: item.productTitle,
+            ...(item.variantTitle ? { variant: item.variantTitle } : {}),
+            ...(item.sku ? { sku: item.sku } : {}),
+            quantity: item.quantity,
+            total: formatMoney(item.totalCents, order.currency),
+          })),
+          subtotal: formatMoney(order.subtotalCents, order.currency),
+          ...(order.discountTotalCents > 0
+            ? { discount: formatMoney(order.discountTotalCents, order.currency) }
+            : {}),
+          shipping: formatMoney(order.shippingTotalCents, order.currency),
+          ...(order.taxTotalCents > 0
+            ? { tax: formatMoney(order.taxTotalCents, order.currency) }
+            : {}),
+          total: formatMoney(order.totalCents, order.currency),
+          paymentMethod: order.paymentMethod,
+          paymentStatus: paid ? 'Paid' : 'Awaiting payment',
+          ...(paid ? {} : { actionNeeded: 'Not paid yet — do not ship.' }),
+          shippingAddress: oneLineAddress(shipping),
+          ...(billing ? { billingAddress: oneLineAddress(billing) } : {}),
+          ...(order.shippingMethodName ? { shippingMethod: order.shippingMethodName } : {}),
+          ...(order.customerNote ? { customerNote: order.customerNote } : {}),
+          adminUrl: adminOrderUrl(order.id),
+        },
+        dedupeKey: `admin-order-placed:${order.id}:${to}`,
+      }))
+    },
+  ])
+
+  // ── A receipt is waiting ──────────────────────────────────────────────────
+
+  /**
+   * Somebody has paid by bank transfer and is waiting on a human.
+   *
+   * This one is more time-sensitive than a new order: the customer has sent
+   * money and their order is sitting unpaid until a member of staff compares
+   * their screenshot against the bank statement. The email carries the claim so
+   * it can be searched for in a statement from a phone, and a link to the queue
+   * — never the image, which is not something to decide about in an inbox.
+   */
+  on('payment.proof_submitted', [
+    async (event) => {
+      const settings = await settingsService.get()
+      const payload = event.payload
+
+      await notificationsService.notifyStaff({
+        type: 'payment.proof_submitted',
+        title: `Receipt to review — ${payload.orderNumber}`,
+        body: `${payload.claimedSenderName} says they sent ${formatMoney(payload.totalCents, payload.currency)}.`,
+        data: { orderId: payload.orderId, url: `${env.CLIENT_ORIGIN}/admin/payments` },
+        dedupeKey: `payment-proof:${payload.proofId}`,
+      })
+
+      await notifyStaffByEmail((to) => ({
+        to,
+        template: 'admin-payment-proof' as const,
+        props: {
+          storeName: settings.storeName,
+          orderNumber: payload.orderNumber,
+          total: formatMoney(payload.totalCents, payload.currency),
+          customerEmail: payload.email,
+          claimedSenderName: payload.claimedSenderName,
+          claimedSenderBank: payload.claimedSenderBank,
+          ...(payload.claimedAccountLast4
+            ? { claimedAccountLast4: payload.claimedAccountLast4 }
+            : {}),
+          reviewUrl: `${env.CLIENT_ORIGIN}/admin/payments`,
+        },
+        dedupeKey: `admin-payment-proof:${payload.proofId}:${to}`,
+      }))
     },
   ])
 

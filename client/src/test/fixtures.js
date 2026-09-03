@@ -535,3 +535,76 @@ export function notification(overrides = {}) {
     ...overrides,
   }
 }
+
+/** The tree `GET /storefront/categories` returns, nested. */
+export function categoryTree() {
+  return [
+    {
+      name: 'Lips',
+      handle: 'lips',
+      description: '<p>Balms and colour.</p>',
+      position: 0,
+      children: [
+        { name: 'Balms', handle: 'balms', description: null, position: 0, children: [] },
+        { name: 'Lipstick', handle: 'lipstick', description: null, position: 1, children: [] },
+      ],
+    },
+    { name: 'Skin', handle: 'skin', description: null, position: 1, children: [] },
+  ]
+}
+
+/** One category, with the trail the detail route adds. */
+export function category(overrides = {}) {
+  return {
+    name: 'Lips',
+    handle: 'lips',
+    description: '<p>Balms and colour.</p>',
+    position: 0,
+    children: [],
+    breadcrumb: [
+      { name: 'Make-up', handle: 'make-up' },
+      { name: 'Lips', handle: 'lips' },
+    ],
+    ...overrides,
+  }
+}
+
+/**
+ * What `POST /storefront/payments/bank-transfer` answers: where to send the
+ * money, and what became of anything already sent.
+ */
+export function bankTransfer(overrides = {}) {
+  return {
+    order: {
+      id: 'order-1',
+      orderNumber: '#1001',
+      total: { amount: 3234, currency: 'GBP' },
+      paymentMethod: 'bank_transfer',
+      paymentStatus: 'pending',
+      status: 'pending',
+    },
+    bankDetails: {
+      accountName: 'Copperleaf Ltd',
+      bankName: 'Example Bank',
+      accountNumber: '12345678',
+      iban: 'GB33BUKB20201555555555',
+      swift: null,
+      instructions: '<p>Use your <strong>order number</strong> as the reference.</p>',
+    },
+    proofs: [],
+    ...overrides,
+  }
+}
+
+export function paymentProof(overrides = {}) {
+  return {
+    id: 'proof-1',
+    status: 'submitted',
+    submittedAt: '2026-08-31T11:00:00.000Z',
+    reviewedAt: null,
+    reviewNote: null,
+    senderName: 'Ada Lovelace',
+    senderBank: 'Example Bank',
+    ...overrides,
+  }
+}

@@ -96,6 +96,17 @@ export const envSchema = z
     SMTP_SECURE: bool.default(false),
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
+    /**
+     * Keep one connection open across messages.
+     *
+     * Off by default. Many shared and cPanel-style hosts close an
+     * authenticated connection after a single message or allow only one at a
+     * time, and a pooled transport then fails every send after the first — so
+     * the first email of an order arrives and the staff copies do not. Turn it
+     * on for a provider that wants it (SES, Postmark, your own Postfix).
+     */
+    SMTP_POOL: bool.default(false),
+    SMTP_MAX_CONNECTIONS: z.coerce.number().int().positive().max(20).optional(),
 
     // ── Object storage ────────────────────────────────────────────────────
     // Supabase Storage is the production backend. `local` writes to disk for

@@ -9,7 +9,7 @@ import { emailSendHandler } from '../../src/jobs/email/emailSend.job.js'
 import { execute, queryOne } from '../../src/infrastructure/database/query.js'
 import type { EmailProvider } from '../../src/infrastructure/email/provider.js'
 import type { JobContext } from '../../src/infrastructure/queue/register.js'
-import type * as QueueModule from '../../src/infrastructure/queue/index.js'
+import { withTransaction } from '../../src/infrastructure/database/transaction.js'
 import { createLogger } from '../../src/infrastructure/logging/logger.js'
 import {
   describeIfDatabase,
@@ -18,12 +18,21 @@ import {
   truncateAll,
 } from '../setup/database.js'
 
-// The queue is not started in tests, so enqueueing is stubbed: this suite is
-// about the mail pipeline, not about pg-boss.
-vi.mock('../../src/infrastructure/queue/index.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof QueueModule>()
-  return { ...actual, enqueue: vi.fn(async () => 'stub-job-id') }
-})
+// The queue is not started in tests, so the *send* is stubbed — but the real
+// `enqueue` is kept, because whether it defers until commit is exactly what
+// some of these tests are about.
+const sends: string[] = []
+vi.mock('../../src/infrastructure/queue/boss.js', () => ({
+  getQueue: () => ({
+    send: async (queue: string) => {
+      sends.push(queue)
+      return 'stub-job-id'
+    },
+  }),
+  startQueue: vi.fn(),
+  stopQueue: vi.fn(),
+  isQueueStarted: () => true,
+}))
 
 const sent: { to: string; subject: string }[] = []
 
@@ -143,10 +152,22 @@ describeIfDatabase('email pipeline', () => {
     expect(sent).toHaveLength(0)
   })
 
-  it('treats a missing row as success — the transaction that created it rolled back', async () => {
+  it('retries a missing row rather than assuming it was rolled back', async () => {
+    /**
+     * This used to resolve, on the reasoning that a missing row meant the
+     * transaction that wrote it had rolled back. That reasoning was wrong in
+     * the case that mattered: far more often the row exists and is simply **not
+     * committed yet**, and swallowing the job destroyed the message — the job
+     * was consumed, the row landed a moment later at zero attempts, and nothing
+     * ever came back for it.
+     *
+     * Retrying costs a dead-lettered job in the genuinely-rolled-back case,
+     * which is visible and harmless. The other way costs somebody's order
+     * confirmation, silently.
+     */
     await expect(
       emailSendHandler({ emailMessageId: '0199a0e0-0000-7000-8000-00000000dead' }, jobContext()),
-    ).resolves.toBeUndefined()
+    ).rejects.toThrow(/does not exist yet/)
     expect(sent).toHaveLength(0)
   })
 
@@ -183,6 +204,117 @@ describeIfDatabase('email pipeline', () => {
 
     await expect(emailSendHandler({ emailMessageId: id }, jobContext())).resolves.toBeUndefined()
     expect((await messageRow(id))?.status).toBe('failed')
+  })
+
+  /**
+   * The regression these two guard.
+   *
+   * The claim moves a row to `sending`, and only this handler can move it out:
+   * the claim itself requires `queued`, and so does the dead-letter watcher.
+   * Anything that threw between the claim and the old `try` therefore left a
+   * message that no retry could take and no failure path could record — no
+   * error, no status change, nothing to look at.
+   *
+   * It reads, from the outside, as one template quietly disappearing while
+   * every other one sends: a customer's order confirmation that never arrives
+   * while the staff copy of the same order does.
+   */
+  it('records a render failure instead of stranding the message in sending', async () => {
+    const { id } = await emailService.enqueue({
+      to: 'g@example.test',
+      template: 'system-check',
+      props,
+    })
+
+    // A template that exists in the registry but whose props the renderer will
+    // reject — a failure *before* the provider is ever reached, which is the
+    // half that used to vanish.
+    await execute(`UPDATE email_messages SET payload = '{}'::jsonb WHERE id = $1`, [id])
+
+    await expect(emailSendHandler({ emailMessageId: id }, jobContext())).rejects.toThrow()
+
+    const row = await messageRow(id)
+    expect(row?.status).toBe('queued')
+    expect(sent).toHaveLength(0)
+    const failed = await queryOne<{ last_error: string | null }>(
+      'SELECT last_error FROM email_messages WHERE id = $1',
+      [id],
+    )
+    expect(failed?.last_error).toBeTruthy()
+  })
+
+  it('does not reopen a row the provider already accepted', async () => {
+    // The one throw that can reach the catch with the row already `sent` is the
+    // `markSent` update itself failing. Reopening it would send a second copy
+    // of somebody's order confirmation to chase a database blip.
+    const { id } = await emailService.enqueue({
+      to: 'h@example.test',
+      template: 'system-check',
+      props,
+    })
+
+    await emailSendHandler({ emailMessageId: id }, jobContext())
+    expect((await messageRow(id))?.status).toBe('sent')
+
+    // A second delivery of the same job finds nothing to claim and leaves the
+    // row alone.
+    await emailSendHandler({ emailMessageId: id }, jobContext())
+    expect((await messageRow(id))?.status).toBe('sent')
+    expect(sent).toHaveLength(1)
+  })
+
+  /**
+   * The race that lost a shop its order confirmations.
+   *
+   * pg-boss writes on its own connection, outside whatever transaction the
+   * caller is in. A job sent from inside one is therefore visible to workers
+   * immediately, while the row it names is invisible to everybody until COMMIT.
+   * A worker winning that race found no row, could not tell that from a
+   * rolled-back transaction, reported success — and the job was gone before the
+   * row existed. The row then committed at zero attempts and nothing ever came
+   * back for it.
+   *
+   * Milliseconds wide against a local database; far wider against a managed one
+   * over a network, which is why it hides in development.
+   */
+  it('does not queue a job until the transaction that wrote the row commits', async () => {
+    sends.length = 0
+    let sentDuringTransaction = 0
+
+    await withTransaction(async () => {
+      await emailService.enqueue({ to: 'race@example.test', template: 'system-check', props })
+      // The row is written but not visible to anybody else yet, so no worker
+      // may be told about it.
+      sentDuringTransaction = sends.length
+    })
+
+    expect(sentDuringTransaction).toBe(0)
+    expect(sends).toEqual(['email.send'])
+  })
+
+  it('queues nothing at all when the transaction rolls back', async () => {
+    sends.length = 0
+
+    await expect(
+      withTransaction(async () => {
+        await emailService.enqueue({ to: 'gone@example.test', template: 'system-check', props })
+        throw new Error('changed my mind')
+      }),
+    ).rejects.toThrow('changed my mind')
+
+    // No row, so no job: the old behaviour queued one and left a worker to
+    // discover the emptiness.
+    expect(sends).toEqual([])
+    const row = await queryOne<{ id: string }>(
+      `SELECT id FROM email_messages WHERE to_email = 'gone@example.test'`,
+    )
+    expect(row).toBeUndefined()
+  })
+
+  it('sends immediately when there is no transaction to wait for', async () => {
+    sends.length = 0
+    await emailService.enqueue({ to: 'direct@example.test', template: 'system-check', props })
+    expect(sends).toEqual(['email.send'])
   })
 
   it('rejects props that do not match the template schema', async () => {

@@ -1,5 +1,7 @@
 import { api } from '@/lib/api/client'
 import type {
+  EmailLogEntry,
+  EmailTemplateSetting,
   AuditQuery,
   AuditRecord,
   InviteStaffInput,
@@ -27,6 +29,58 @@ export const settingsApi = {
   get: () => api.get<StoreSettings>('/admin/settings'),
 
   update: (patch: StoreSettingsPatch) => api.patch<StoreSettings>('/admin/settings', patch),
+
+  // ── Emails ────────────────────────────────────────────────────────────────
+
+  /**
+   * Every template the server knows about, with its current state.
+   *
+   * Driven by the server's registry, not by a list kept here — a template added
+   * on the server appears in this screen without a frontend release, which is
+   * the whole reason the endpoint returns the catalogue rather than just the
+   * overrides.
+   */
+  emailTemplates: () => api.get<EmailTemplateSetting[]>('/admin/settings/emails'),
+
+  /**
+   * What the shop actually sent, and what became of it.
+   *
+   * The delivery half of the screen above. Every status is a different problem
+   * with a different fix, and from an empty inbox they look identical.
+   */
+  emailLog: (params: { page?: number; limit?: number; status?: string; to?: string } = {}) =>
+    api.list<EmailLogEntry>('/admin/settings/emails/log', {
+      query: {
+        page: params.page,
+        limit: params.limit,
+        status: params.status,
+        to: params.to,
+      },
+    }),
+
+  /**
+   * Proves delivery works, without placing an order to find out.
+   *
+   * Deliberately takes an address: mailing the shop's own contact address only
+   * proves the server can deliver to itself, which is exactly the case that
+   * looks healthy while every customer email is being refused.
+   */
+  sendTestEmail: (to: string) =>
+    api.post<{ id: string; status: string }>('/admin/settings/emails/test', { to }),
+
+  /**
+   * Sends one message again, after fixing whatever stopped it.
+   *
+   * Refused for a message that already went out — a duplicate order
+   * confirmation is a worse outcome than none.
+   */
+  retryEmail: (id: string) =>
+    api.post<EmailLogEntry>(`/admin/settings/emails/log/${id}/retry`),
+
+  setEmailTemplate: (template: string, enabled: boolean) =>
+    api.patch<{ template: string; enabled: boolean }>(`/admin/settings/emails/${template}`, {
+      enabled,
+    }),
 
   // ── Staff ─────────────────────────────────────────────────────────────────
 

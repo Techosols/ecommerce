@@ -1,0 +1,37 @@
+New order {{orderNumber}} — {{total}}
+
+Placed {{placedAt}} by {{#if customerName}}{{customerName}}{{else}}{{customerEmail}}{{/if}}{{#if isReturningCustomer}} (returning customer){{/if}}.
+{{#if actionNeeded}}
+** {{actionNeeded}} **
+{{/if}}
+
+ITEMS
+{{#each items}}
+- {{this.title}}{{#if this.variant}} ({{this.variant}}){{/if}} x{{this.quantity}} — {{this.total}}{{#if this.sku}} [{{this.sku}}]{{/if}}
+{{/each}}
+
+Subtotal {{subtotal}}
+{{#if discount}}Discount{{#if discountCode}} ({{discountCode}}){{/if}} -{{discount}}
+{{/if}}Shipping{{#if shippingMethod}} — {{shippingMethod}}{{/if}} {{shipping}}
+{{#if tax}}Tax {{tax}}
+{{/if}}TOTAL {{total}}
+
+PAYMENT
+{{paymentMethod}} — {{paymentStatus}}
+
+SHIP TO
+{{shippingAddress}}
+{{#if billingAddress}}
+BILL TO
+{{billingAddress}}
+{{/if}}
+
+CONTACT
+{{customerEmail}}{{#if customerPhone}}
+{{customerPhone}}{{/if}}
+{{#if customerNote}}
+CUSTOMER NOTE
+{{customerNote}}
+{{/if}}
+
+Open in the admin: {{adminUrl}}

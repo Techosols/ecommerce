@@ -19,9 +19,12 @@ import { useOpenReturn, useReturnable } from '../hooks/returns.hooks'
  * When nothing is returnable the server says why, and that sentence is shown
  * verbatim rather than replaced with a generic one.
  */
-export function ReturnRequest({ orderId, enabled }) {
-  const returnable = useReturnable(orderId, enabled)
-  const open = useOpenReturn(orderId)
+export function ReturnRequest({ orderId, enabled, claim }) {
+  // `claim` is the guest's order number and email. With it, the same form works
+  // for somebody who never made an account — which is most of this shop's
+  // orders, and who until now had to send an email instead.
+  const returnable = useReturnable(orderId, enabled, claim)
+  const open = useOpenReturn(orderId, claim)
   const [quantities, setQuantities] = useState({})
   const [reason, setReason] = useState('no_longer_wanted')
   const [note, setNote] = useState('')

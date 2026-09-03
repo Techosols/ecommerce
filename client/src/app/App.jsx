@@ -8,12 +8,14 @@ import { HomePage } from '@/features/catalogue/pages/HomePage'
 import { ProductListPage } from '@/features/catalogue/pages/ProductListPage'
 import { ProductPage } from '@/features/catalogue/pages/ProductPage'
 import { CollectionPage } from '@/features/catalogue/pages/CollectionPage'
+import { CategoryPage } from '@/features/catalogue/pages/CategoryPage'
 import { CartPage } from '@/features/cart/pages/CartPage'
 import { CheckoutPage } from '@/features/checkout/pages/CheckoutPage'
 import { OrderPage } from '@/features/account/pages/OrderPage'
 import { MyOrdersPage } from '@/features/account/pages/MyOrdersPage'
 import { MyOrderPage } from '@/features/account/pages/MyOrderPage'
 import { OrderLookupPage } from '@/features/account/pages/OrderLookupPage'
+import { BankTransferPage } from '@/features/payments/pages/BankTransferPage'
 import { SignInPage } from '@/features/account/pages/SignInPage'
 import { AccountLayout } from '@/features/account/components/AccountLayout'
 import { AddressesPage } from '@/features/account/pages/AddressesPage'
@@ -56,6 +58,7 @@ export function App() {
                 <Route path="/products" element={<ProductListPage />} />
                 <Route path="/products/:handle" element={<ProductPage />} />
                 <Route path="/collections/:handle" element={<CollectionPage />} />
+                <Route path="/categories/:handle" element={<CategoryPage />} />
 
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
@@ -64,6 +67,9 @@ export function App() {
                     order id. By id, not by order number: the store's number
                     prefix defaults to "#", which in a URL is a fragment. */}
                 <Route path="/orders/lookup" element={<OrderLookupPage />} />
+                {/* Not under /orders: it is reached without a session, from a
+                    confirmation email as often as from the site. */}
+                <Route path="/pay/bank-transfer" element={<BankTransferPage />} />
                 <Route path="/orders/:id" element={<OrderPage />} />
 
                 <Route path="/sign-in" element={<SignInPage />} />

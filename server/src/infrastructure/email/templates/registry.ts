@@ -21,6 +21,8 @@ import { orderDeliveredProps, type OrderDeliveredProps } from './order-delivered
 import { orderCancelledProps, type OrderCancelledProps } from './order-cancelled/props.js'
 import { orderRefundedProps, type OrderRefundedProps } from './order-refunded/props.js'
 import { cartAbandonedProps, type CartAbandonedProps } from './cart-abandoned/props.js'
+import { adminOrderPlacedProps, type AdminOrderPlacedProps } from './admin-order-placed/props.js'
+import { adminPaymentProofProps, type AdminPaymentProofProps } from './admin-payment-proof/props.js'
 
 export interface TemplateDefinition<P> {
   /** Directory name under templates/. */
@@ -29,6 +31,30 @@ export interface TemplateDefinition<P> {
   subject: (props: P) => string
   /** Short preheader text shown by mail clients next to the subject. */
   preview?: (props: P) => string
+}
+
+/**
+ * The emails that cannot be switched off, and why.
+ *
+ * Each of these is how somebody gets back into an account or is told their
+ * account changed. Turning one off does not produce an error anywhere — it
+ * produces a shop where password reset silently does nothing, discovered weeks
+ * later from a customer who has given up. The settings screen shows them as
+ * always on with this reason beside them rather than hiding them, so nobody
+ * goes looking for a switch that was quietly removed.
+ */
+export const ALWAYS_ON: Partial<Record<TemplateName, string>> = {
+  'email-verification': 'Without it a new account can never confirm its address.',
+  'password-reset': 'The only way back into an account with a forgotten password.',
+  'password-changed': 'Tells somebody their password changed — the first sign of a break-in.',
+  'account-exists': 'Answers a reset request for an address that has no account.',
+  'staff-invitation': 'A colleague cannot accept an invitation they never receive.',
+  'system-check': 'Sent only by you, to test delivery.',
+}
+
+/** Whether this template may be switched off at all. */
+export function isAlwaysOn(template: string): boolean {
+  return template in ALWAYS_ON
 }
 
 export const EMAIL_TEMPLATES = {
@@ -135,6 +161,28 @@ export const EMAIL_TEMPLATES = {
     subject: (p: OrderRefundedProps) => `A refund of ${p.amount} for order ${p.orderNumber}`,
     preview: (p: OrderRefundedProps) => `${p.amount} is on its way back to you.`,
   } satisfies TemplateDefinition<OrderRefundedProps>,
+
+  // ── Alerts to the shop's own staff ────────────────────────────────────────
+  //
+  // Templates like any other, so they queue, dedupe, record and switch off
+  // through exactly the same machinery. The only thing that makes them
+  // "internal" is who `to` is, which the subscriber decides.
+
+  'admin-order-placed': {
+    dir: 'admin-order-placed',
+    schema: adminOrderPlacedProps,
+    subject: (p: AdminOrderPlacedProps) => `New order ${p.orderNumber} — ${p.total}`,
+    preview: (p: AdminOrderPlacedProps) =>
+      p.actionNeeded ?? `${p.paymentMethod} — ${p.paymentStatus}.`,
+  } satisfies TemplateDefinition<AdminOrderPlacedProps>,
+
+  'admin-payment-proof': {
+    dir: 'admin-payment-proof',
+    schema: adminPaymentProofProps,
+    subject: (p: AdminPaymentProofProps) => `Receipt to review — order ${p.orderNumber}`,
+    preview: (p: AdminPaymentProofProps) =>
+      `${p.claimedSenderName} says they sent ${p.total}.`,
+  } satisfies TemplateDefinition<AdminPaymentProofProps>,
 
   /**
    * Marketing, not transactional: this one respects marketing consent and the

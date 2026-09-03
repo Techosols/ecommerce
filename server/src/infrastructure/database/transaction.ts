@@ -24,6 +24,20 @@ export type Executor = Pick<Pool | PoolClient, 'query'>
 export interface Transaction {
   readonly client: PoolClient
   readonly depth: number
+  /**
+   * Work to run once this transaction has actually committed.
+   *
+   * The problem this solves: anything that reaches *outside* the transaction —
+   * a queue job, a webhook, a cache invalidation — becomes visible to the rest
+   * of the world immediately, while the rows it refers to do not exist for
+   * anybody else until COMMIT. A worker that picks up such a job in that window
+   * looks for a row that is not there yet and concludes there is nothing to do.
+   *
+   * That window is milliseconds on a local database and much wider against a
+   * managed one across a network, which is why it hides in development and
+   * bites in production.
+   */
+  readonly afterCommit: (task: () => Promise<void>) => void
 }
 
 const storage = new AsyncLocalStorage<Transaction>()
@@ -67,7 +81,14 @@ export function isInTransaction(): boolean {
 
 async function runNested<T>(parent: Transaction, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   const savepoint = `sp_${parent.depth + 1}`
-  const nested: Transaction = { client: parent.client, depth: parent.depth + 1 }
+  // A nested block's after-commit work belongs to the outermost transaction:
+  // releasing a savepoint commits nothing, and the enclosing transaction can
+  // still roll the whole thing back.
+  const nested: Transaction = {
+    client: parent.client,
+    depth: parent.depth + 1,
+    afterCommit: parent.afterCommit,
+  }
 
   await parent.client.query(`SAVEPOINT ${savepoint}`)
   try {
@@ -82,12 +103,34 @@ async function runNested<T>(parent: Transaction, fn: (tx: Transaction) => Promis
 
 async function runOnce<T>(fn: (tx: Transaction) => Promise<T>, options: TransactionOptions) {
   const client = await getPool().connect()
-  const tx: Transaction = { client, depth: 0 }
+  const tasks: Array<() => Promise<void>> = []
+  const tx: Transaction = {
+    client,
+    depth: 0,
+    afterCommit: (task) => tasks.push(task),
+  }
 
   try {
     await client.query(options.readOnly ? 'BEGIN READ ONLY' : 'BEGIN')
     const result = await storage.run(tx, () => fn(tx))
     await client.query('COMMIT')
+
+    /**
+     * Only now, and never before.
+     *
+     * Each task runs on its own: one failing must not lose the others, and
+     * none of them can undo the commit that has already happened. A failure
+     * here is logged rather than thrown, because the caller's work succeeded —
+     * turning it into an error would roll back nothing and report a lie.
+     */
+    for (const task of tasks) {
+      try {
+        await task()
+      } catch (error) {
+        log.error({ err: error }, 'after-commit task failed')
+      }
+    }
+
     return result
   } catch (error) {
     try {

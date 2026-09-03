@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { messageOf } from '@/lib/api'
-import { useOrderLookup } from '@/features/checkout/hooks/checkout.hooks'
+import { useCancelGuestOrder, useOrderLookup } from '@/features/checkout/hooks/checkout.hooks'
+import { ReturnRequest } from '../components/ReturnRequest'
 import { OrderView } from './OrderPage'
 
 /**
@@ -21,7 +22,17 @@ export function OrderLookupPage() {
   const [email, setEmail] = useState('')
   const lookup = useOrderLookup()
 
-  if (lookup.data) return <OrderView order={lookup.data} />
+  // Found: the same order view a signed-in customer gets, with the same
+  // controls. A guest checkout is most of this shop's orders, and until now the
+  // people who use it got a page they could only read.
+  if (lookup.data) {
+    return (
+      <FoundOrder
+        order={lookup.data}
+        claim={{ orderNumber: lookup.data.orderNumber, email: email.trim() }}
+      />
+    )
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-6 py-8">
@@ -88,6 +99,68 @@ export function OrderLookupPage() {
         .
       </p>
     </div>
+  )
+}
+
+/**
+ * The found order, with what its owner can still do to it.
+ *
+ * Which controls appear is decided the same way the signed-in page decides:
+ * cancelling only while nothing has shipped, and returning only once something
+ * has — and even then the server is asked what is returnable rather than being
+ * told. Neither is inferred from the status vocabulary alone.
+ */
+function FoundOrder({ order, claim }) {
+  const cancel = useCancelGuestOrder()
+  const [confirming, setConfirming] = useState(false)
+
+  const current = cancel.data ?? order
+  const cancellable = current.status === 'pending' || current.status === 'confirmed'
+
+  return (
+    <OrderView
+      order={current}
+      actions={
+        <>
+          {!cancellable ? <ReturnRequest orderId={current.id} claim={claim} /> : null}
+
+          {cancellable ? (
+            <section className="border-line rounded-card border border-dashed p-5">
+              <h2 className="text-ink mb-1 text-base font-semibold">Changed your mind?</h2>
+              <p className="text-muted mb-3 text-sm">
+                You can cancel while it is still being prepared. Once it is on its way, ask us for a
+                return instead.
+              </p>
+
+              {cancel.error ? (
+                <p className="border-bad/30 bg-bad-soft text-bad mb-3 rounded-lg border px-3 py-2 text-sm">
+                  {messageOf(cancel.error)}
+                </p>
+              ) : null}
+
+              {/* Never one click. Cancelling releases the stock and cannot be
+                  undone from here — the shopper would have to order again. */}
+              {confirming ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="primary"
+                    isLoading={cancel.isPending}
+                    onClick={() => cancel.mutate(claim)}
+                  >
+                    Yes, cancel it
+                  </Button>
+                  <Button onClick={() => setConfirming(false)} disabled={cancel.isPending}>
+                    Keep the order
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={() => setConfirming(true)}>Cancel this order</Button>
+              )}
+            </section>
+          ) : null}
+        </>
+      }
+    />
   )
 }
 

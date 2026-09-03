@@ -28,7 +28,19 @@ export function SignInPage({ mode = 'sign-in' }) {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  const next = location.state?.from ?? '/account/orders'
+  /**
+   * Where to go once they are in.
+   *
+   * Navigation state when something sent them here deliberately, then `?next=`
+   * for the redirects that cannot carry state — a `<Navigate>` from checkout
+   * when the shop requires an account, and any link in an email.
+   *
+   * Only a path, never a whole URL: accepting `?next=https://…` would turn the
+   * sign-in page into an open redirect, which is a phishing link with this
+   * shop's name on it.
+   */
+  const requested = location.state?.from ?? new URLSearchParams(location.search).get('next')
+  const next = requested?.startsWith('/') && !requested.startsWith('//') ? requested : '/account/orders'
 
   if (isRestoring) return <p className="text-muted py-16 text-center">Checking your session…</p>
   if (isSignedIn) return <Navigate to={next} replace />

@@ -5,7 +5,7 @@ import { Drawer } from '@/components/ui/Drawer'
 import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { useToast } from '@/components/ui/toast.context'
 import { messageOf } from '@/lib/api/errors'
 import { useCreateCollection } from '../hooks/collections.hooks'
@@ -94,7 +94,10 @@ export function CollectionFormDialog({ isOpen, onClose, onCreated }: CollectionF
           <Input value={title} onChange={(event) => setTitle(event.target.value)} />
         </Field>
 
-        <Field label="Handle" hint="Its address on the storefront. Left blank, it follows the title.">
+        <Field
+          label="Handle"
+          hint="Its address on the storefront. Left blank, it follows the title."
+        >
           <Input
             value={handle}
             placeholder="best-sellers"
@@ -103,11 +106,11 @@ export function CollectionFormDialog({ isOpen, onClose, onCreated }: CollectionF
         </Field>
 
         <Field label="Description">
-          <Textarea
-            rows={3}
-            maxLength={2000}
+          <RichTextEditor
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            aria-label="Description"
+            minHeight="9rem"
+            onChange={setDescription}
           />
         </Field>
 

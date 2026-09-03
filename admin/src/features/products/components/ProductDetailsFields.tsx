@@ -3,7 +3,7 @@ import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { TagsInput } from '@/components/ui/TagsInput'
-import { Textarea } from '@/components/ui/Textarea'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { useCategoryTree } from '@/features/categories/hooks/categories.hooks'
 import type { FormState } from '@/lib/useFormState'
 import type { ProductDetailsValues } from './productDetails'
@@ -71,13 +71,17 @@ export function ProductInfoCard({
         </Field>
 
         <Field label="Description" error={errors.description}>
-          <Textarea
-            rows={10}
+          {/* HTML in and out, so the column and the API contract are unchanged
+              — a textarea was already storing whatever was typed. What is new
+              is that the server now sanitises it, because this is rendered as
+              markup on the storefront rather than escaped. */}
+          <RichTextEditor
             value={values.description}
-            maxLength={20_000}
             disabled={disabled}
+            aria-label="Description"
+            minHeight="16rem"
             placeholder="What it is, what it is made of, why someone would want it."
-            onChange={(event) => setValue('description', event.target.value)}
+            onChange={(html) => setValue('description', html)}
           />
         </Field>
 

@@ -1,0 +1,75 @@
+<mj-text font-size="17px" font-weight="600" padding-bottom="4px">
+  New order {{orderNumber}} — {{total}}
+</mj-text>
+
+<mj-text color="#52606d" padding-top="0" padding-bottom="12px">
+  Placed {{placedAt}} by {{#if customerName}}{{customerName}}{{else}}{{customerEmail}}{{/if}}{{#if isReturningCustomer}} (returning customer){{/if}}.
+</mj-text>
+
+{{#if actionNeeded}}
+<mj-text background-color="#fff7ed" color="#9a3412" padding="10px 12px">
+  <strong>{{actionNeeded}}</strong>
+</mj-text>
+{{/if}}
+
+<mj-table font-size="14px" cellpadding="6">
+  {{#each items}}
+  <tr>
+    <td style="padding:6px 0;border-bottom:1px solid #e4e7eb;">
+      {{this.title}}{{#if this.variant}} <span style="color:#7b8794;">({{this.variant}})</span>{{/if}}
+      <span style="color:#7b8794;">× {{this.quantity}}</span>
+      {{#if this.sku}}<br /><span style="color:#9aa5b1;font-size:12px;">{{this.sku}}</span>{{/if}}
+    </td>
+    <td align="right" style="padding:6px 0;border-bottom:1px solid #e4e7eb;">{{this.total}}</td>
+  </tr>
+  {{/each}}
+  <tr>
+    <td style="padding-top:10px;color:#52606d;">Subtotal</td>
+    <td align="right" style="padding-top:10px;">{{subtotal}}</td>
+  </tr>
+  {{#if discount}}
+  <tr>
+    <td style="color:#52606d;">Discount{{#if discountCode}} ({{discountCode}}){{/if}}</td>
+    <td align="right">−{{discount}}</td>
+  </tr>
+  {{/if}}
+  <tr>
+    <td style="color:#52606d;">Shipping{{#if shippingMethod}} — {{shippingMethod}}{{/if}}</td>
+    <td align="right">{{shipping}}</td>
+  </tr>
+  {{#if tax}}
+  <tr>
+    <td style="color:#52606d;">Tax</td>
+    <td align="right">{{tax}}</td>
+  </tr>
+  {{/if}}
+  <tr>
+    <td style="padding-top:8px;font-weight:600;border-top:1px solid #e4e7eb;">Total</td>
+    <td align="right" style="padding-top:8px;font-weight:600;border-top:1px solid #e4e7eb;">{{total}}</td>
+  </tr>
+</mj-table>
+
+<mj-text font-weight="600" padding-bottom="2px" padding-top="16px">Payment</mj-text>
+<mj-text color="#52606d" padding-top="0">
+  {{paymentMethod}} — <strong>{{paymentStatus}}</strong>
+</mj-text>
+
+<mj-text font-weight="600" padding-bottom="2px" padding-top="12px">Ship to</mj-text>
+<mj-text color="#52606d" padding-top="0">{{shippingAddress}}</mj-text>
+
+{{#if billingAddress}}
+<mj-text font-weight="600" padding-bottom="2px" padding-top="12px">Bill to</mj-text>
+<mj-text color="#52606d" padding-top="0">{{billingAddress}}</mj-text>
+{{/if}}
+
+<mj-text font-weight="600" padding-bottom="2px" padding-top="12px">Contact</mj-text>
+<mj-text color="#52606d" padding-top="0">
+  {{customerEmail}}{{#if customerPhone}}<br />{{customerPhone}}{{/if}}
+</mj-text>
+
+{{#if customerNote}}
+<mj-text font-weight="600" padding-bottom="2px" padding-top="12px">Customer note</mj-text>
+<mj-text color="#52606d" padding-top="0"><em>{{customerNote}}</em></mj-text>
+{{/if}}
+
+<mj-button href="{{adminUrl}}" padding-top="20px">Open in the admin</mj-button>

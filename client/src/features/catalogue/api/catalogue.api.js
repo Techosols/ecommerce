@@ -8,12 +8,18 @@ import { api } from '@/lib/api'
  * sellable. So the storefront never has to ask "should this be visible" — if
  * it came back, it is for sale.
  *
- * **The shop browses by collection, not by category.** Both exist on the
- * server and they answer different questions: a category is where a product
- * *files* (one each, a deep tree the merchant maintains), a collection is
- * where products *appear together* (a hand-picked list, or a rule). A shopper
- * wants the second. The category tree is also the wrong shape for a shopfront
- * — it can run to thousands of nodes, most of them empty.
+ * **Collections lead; categories are the second way in.** The two answer
+ * different questions and both are offered, in that order of prominence. A
+ * category is where a product *files* — one each, in a tree the merchant
+ * maintains — and a collection is where products *appear together*, hand-picked
+ * or by rule. The front page and the main navigation are collections, because a
+ * shopper arriving cold wants "gifts under £30", not a taxonomy.
+ *
+ * Categories earn their place for the shopper who knows what kind of thing they
+ * want. They are exposed as a browsable tree rather than as the whole tree at
+ * once: the top level is the menu, and each category page shows its own
+ * children alongside its products, so a deep taxonomy is walked a level at a
+ * time instead of being flattened into a menu with a thousand entries.
  *
  * Note what the URLs carry: **handles, never ids**. `?collection=bestsellers`
  * is an address a person can read, type and link to; a uuid is not. The server
@@ -27,6 +33,10 @@ export const catalogueApi = {
         page: params.page,
         limit: params.limit,
         collection: params.collection,
+        // A handle, resolved on the server. An unknown one comes back as an
+        // empty page rather than an error, so a stale link shows "nothing
+        // here" instead of breaking.
+        category: params.category,
         // Sorting and filtering are the server's. `buildQuery` drops empty
         // values, so an unset filter never reaches the API as a filter that
         // filters nothing.
@@ -43,4 +53,10 @@ export const catalogueApi = {
   collections: () => api.get('/storefront/collections'),
 
   collection: (handle) => api.get(`/storefront/collections/${handle}`),
+
+  /** The whole active tree, each node carrying its own children. */
+  categories: () => api.get('/storefront/categories'),
+
+  /** One category, with the trail back to the root for breadcrumbs. */
+  category: (handle) => api.get(`/storefront/categories/${handle}`),
 }
