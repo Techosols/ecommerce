@@ -55,11 +55,11 @@ export function UserMenu() {
           <button
             ref={ref}
             type="button"
-            className="hover:bg-surface-hover flex items-center gap-2 rounded-lg py-1 pr-2 pl-1 transition-colors"
+            className="hover:bg-ink dark:hover:bg-surface flex items-center gap-2 rounded-lg py-1 pr-2 pl-1 transition-colors"
             {...props}
           >
             <Avatar initials={initialsOf(user.firstName, user.lastName, user.email)} size="sm" />
-            <span className="text-ink hidden max-w-32 truncate text-sm font-medium sm:block">
+            <span className="text-white dark:text-ink hidden max-w-32 truncate text-sm font-medium sm:block">
               {name}
             </span>
             <ChevronDown aria-hidden="true" className="text-faint size-4 shrink-0" />

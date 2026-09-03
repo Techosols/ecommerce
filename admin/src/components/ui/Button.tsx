@@ -28,11 +28,17 @@ import { Spinner } from './Spinner'
  */
 const variants = {
   primary:
-    'bg-ink text-white shadow-card hover:bg-ink/90 active:bg-black disabled:bg-faint',
+    'bg-[#303030] text-white shadow-card hover:bg-[#4a4a4a] active:bg-black disabled:bg-faint',
+
   secondary:
-    'bg-surface text-ink shadow-card ring-1 ring-line-strong ring-inset hover:bg-surface-hover active:bg-surface-sunken',
-  subtle: 'bg-surface-sunken text-ink hover:bg-surface-hover active:bg-line',
-  ghost: 'text-ink-soft hover:bg-surface-hover hover:text-ink active:bg-surface-sunken',
+    'bg-[#4a4a4a] text-white shadow-card ring-1 ring-line-strong ring-inset hover:bg-[#303030] active:bg-[#303030]-active',
+
+  subtle:
+    'bg-[#4a4a4a] text-[#303030] hover:bg-[#303030] active:bg-[#303030]',
+
+  ghost:
+    'text-[#4a4a4a] hover:bg-[#303030] hover:text-[#303030] active:bg-[#4a4a4a]',
+
   danger:
     'bg-danger text-white shadow-card hover:brightness-110 active:brightness-95 disabled:opacity-50',
 } as const
