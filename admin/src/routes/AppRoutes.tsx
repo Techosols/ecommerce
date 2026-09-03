@@ -3,9 +3,12 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { AcceptInvitationPage } from '@/pages/AcceptInvitationPage'
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
-import { AnalyticsPage } from '@/pages/placeholders'
+import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage'
 import { PaymentsPage } from '@/features/payments'
 import { CartDetailPage } from '@/features/checkout/pages/CartDetailPage'
 import { CartListPage } from '@/features/checkout/pages/CartListPage'
@@ -58,6 +61,13 @@ export function AppRoutes() {
       <Route element={<PublicOnlyRoute />}>
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
+          {/* Reached from a link in an email, by somebody who is not signed in
+              and — in the invitation's case — has no password to sign in with.
+              `PublicOnlyRoute` is right for all three: an operator who is
+              already signed in has no business on any of them. */}
+          <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
       </Route>
 

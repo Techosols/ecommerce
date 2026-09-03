@@ -27,4 +27,32 @@ export const authApi = {
 
   changePassword: (input: { currentPassword: string; newPassword: string }) =>
     api.post<void>('/auth/password/change', input),
+
+  // ── The three token flows ─────────────────────────────────────────────────
+  //
+  // All unauthenticated, all reached from a link in an email, and all
+  // `skipAuthRefresh`: there is no session to refresh, and attempting one would
+  // spend the refresh cookie of whoever was last signed in on this browser.
+
+  /**
+   * A colleague setting their first password.
+   *
+   * The server issues no session in return — the invitee signs in normally
+   * afterwards, so there is exactly one login path to reason about.
+   */
+  acceptInvitation: (input: { token: string; password: string }) =>
+    api.post<{ accepted: true }>('/auth/invitation/accept', input, { skipAuthRefresh: true }),
+
+  /**
+   * Starting a password reset.
+   *
+   * Always succeeds, whatever address is given: answering differently for an
+   * address that has an account would turn this form into a way to discover who
+   * works here.
+   */
+  requestPasswordReset: (email: string) =>
+    api.post<void>('/auth/password/forgot', { email }, { skipAuthRefresh: true }),
+
+  resetPassword: (input: { token: string; password: string }) =>
+    api.post<void>('/auth/password/reset', input, { skipAuthRefresh: true }),
 }

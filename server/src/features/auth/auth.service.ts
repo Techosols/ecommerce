@@ -34,6 +34,7 @@ import {
   verifyAccessToken,
 } from '../../shared/auth/tokens.js'
 import { generateSecret, hashSecret } from '../../shared/auth/secrets.js'
+import { isStaffRoles } from '../../shared/auth/actor.js'
 import {
   assertPasswordAcceptable,
   hashPassword,
@@ -87,8 +88,22 @@ function verificationLink(token: string): string {
   return `${env.CLIENT_ORIGIN}/verify-email?token=${encodeURIComponent(token)}`
 }
 
-function resetLink(token: string): string {
-  return `${env.CLIENT_ORIGIN}/reset-password?token=${encodeURIComponent(token)}`
+/**
+ * Where a reset link points depends on who is resetting.
+ *
+ * Staff sign in to the admin and customers to the shopfront, and they are
+ * different applications on different origins. A single link sent to both puts
+ * one of them in the wrong place: a colleague who has forgotten their password
+ * follows it, lands on the storefront, sets a new password there and is left
+ * looking at a shop with no way through to the console they were trying to
+ * reach.
+ *
+ * The token itself is identical either way — it is the same account and the
+ * same endpoint. Only the page that collects the new password differs.
+ */
+function resetLink(token: string, roles: readonly string[]): string {
+  const origin = isStaffRoles(roles) ? env.ADMIN_ORIGIN : env.CLIENT_ORIGIN
+  return `${origin}/reset-password?token=${encodeURIComponent(token)}`
 }
 
 /** Issues an access token plus a fresh refresh session. */
@@ -151,6 +166,10 @@ export const authService = {
       await emailService.enqueue({
         to: input.email,
         template: 'account-exists',
+        // No account, so no roles to steer by — and the address is the one
+        // that was typed, which for a stranger probing the form is the
+        // storefront's audience. The mail says an account already exists
+        // elsewhere; it does not need to be right about which console.
         props: { email: input.email, resetUrl: `${env.CLIENT_ORIGIN}/forgot-password` },
         dedupeKey: `account-exists:${existing.id}:${dayStamp()}`,
       })
@@ -562,7 +581,7 @@ export const authService = {
       to: user.email,
       template: 'password-reset',
       props: {
-        resetUrl: resetLink(token),
+        resetUrl: resetLink(token, user.roles),
         expiresInMinutes: env.PASSWORD_RESET_TTL_MINUTES,
       },
       dedupeKey: `password-reset:${tokenId}`,

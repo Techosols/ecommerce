@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { LoginForm } from '@/features/auth/LoginForm'
 import { useAuth } from '@/features/auth/useAuth'
@@ -33,6 +33,15 @@ export function LoginPage() {
           void navigate(from ?? '/dashboard', { replace: true })
         }}
       />
+
+      {/* Below the form, not beside the password field: somebody who can sign
+          in should not be offered a reset first. */}
+      <Link
+        to="/forgot-password"
+        className="text-muted hover:text-ink text-center text-sm"
+      >
+        Forgotten your password?
+      </Link>
     </div>
   )
 }
