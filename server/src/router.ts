@@ -46,6 +46,7 @@ import { returnsStorefrontRoutes } from './features/returns/returns.routes.js'
 import { returnsAdminRoutes } from './features/returns/returns.admin.routes.js'
 import { shippingStorefrontRoutes } from './features/shipping/shipping.routes.js'
 import { shippingAdminRoutes } from './features/shipping/shipping.admin.routes.js'
+import { codAdminRoutes } from './features/shipping/cod.admin.routes.js'
 import { discountsStorefrontRoutes } from './features/discounts/discounts.routes.js'
 import { discountsAdminRoutes } from './features/discounts/discounts.admin.routes.js'
 import {
@@ -55,6 +56,7 @@ import {
 import { analyticsStorefrontRoutes } from './features/analytics/analytics.routes.js'
 import { analyticsAdminRoutes } from './features/analytics/analytics.admin.routes.js'
 import { paymentsWebhookRoutes } from './features/payments/payments.webhook.routes.js'
+import { shippingWebhookRoutes } from './features/shipping/shipping.webhook.routes.js'
 
 export const authRouter: Router = Router()
 authRouter.use(authLimiter)
@@ -105,6 +107,7 @@ adminRouter.use(paymentsAdminRoutes)
 adminRouter.use(cartsAdminRoutes)
 adminRouter.use(returnsAdminRoutes)
 adminRouter.use(shippingAdminRoutes)
+adminRouter.use(codAdminRoutes)
 adminRouter.use(discountsAdminRoutes)
 adminRouter.use(analyticsAdminRoutes)
 // Already authenticated by the stack above, so the notifications router is
@@ -116,6 +119,7 @@ export const webhookRouter: Router = Router()
 // Raw body first: a signature is computed over the exact bytes sent (§16.6).
 webhookRouter.use(noCors(), webhookLimiter, rawBodyJson())
 webhookRouter.use(paymentsWebhookRoutes)
+webhookRouter.use(shippingWebhookRoutes)
 
 export function buildApiRouter(): Router {
   const router = Router()

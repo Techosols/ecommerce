@@ -98,7 +98,15 @@ export const checkoutService = {
           lastName: input.shippingAddress.lastName,
           phone: input.phone ?? input.shippingAddress.phone ?? null,
         }),
-      quoteShipping: (args) => shippingService.rateForCheckout(args),
+      // The address checkout was given, not just its country: a courier prices
+      // the door it is going to. Only the shop's own rates ignore it.
+      quoteShipping: (args) =>
+        shippingService.rateForCheckout({
+          ...args,
+          city: input.shippingAddress.city,
+          postalCode: input.shippingAddress.postalCode,
+          cashOnDelivery: input.paymentMethod === 'cod',
+        }),
       applyDiscount: (args) => discountsService.quote({ ...args, signedIn }),
       redeemDiscount: (args) => discountsService.redeem(args),
       resolvePaymentMethod: (args) => this.resolveMethod({ ...args, signedIn }),
@@ -129,7 +137,13 @@ export const checkoutService = {
         customerId: context.customerId,
         source: 'admin',
         actor: context.actor,
-        quoteShipping: (args) => shippingService.rateForCheckout(args),
+        quoteShipping: (args) =>
+          shippingService.rateForCheckout({
+            ...args,
+            city: rest.shippingAddress.city,
+            postalCode: rest.shippingAddress.postalCode,
+            cashOnDelivery: rest.paymentMethod === 'cod',
+          }),
         applyDiscount: (args) => discountsService.quote(args),
         redeemDiscount: (args) => discountsService.redeem(args),
         // Staff, not a customer — so `manual` is allowed here and nowhere else.
@@ -253,6 +267,12 @@ export const checkoutService = {
           countryCode: input.countryCode,
           subtotalCents: subtotal - discountTotal,
           weightGrams,
+          // A preview has no address — the shopper is still choosing — but it
+          // does know how they mean to pay, and carrying cash costs more. The
+          // preview is deliberately allowed to differ from the final price for
+          // exactly this reason: it is a quote for a country, and checkout
+          // re-rates against the door.
+          cashOnDelivery: input.paymentMethod === 'cod',
         })
       : []
 

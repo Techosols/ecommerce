@@ -21,6 +21,7 @@ import { messageOf } from '@/lib/api/errors'
 import { describeMethod } from '../components/methodLabels'
 import { MethodDialog } from '../components/MethodDialog'
 import { RatePreview } from '../components/RatePreview'
+import { CarrierCard } from '../components/CarrierCard'
 import {
   useArchiveMethod,
   useArchiveZone,
@@ -141,6 +142,11 @@ export function ShippingPage() {
         </div>
 
         <div className="flex flex-col gap-6">
+          {/* Above the preview, because it explains it: with a courier
+              connected the quote below is the cheaper of the rate card and the
+              courier's live price, and an operator reading a number lower than
+              anything they typed needs to know why. */}
+          <CarrierCard />
           <RatePreview />
         </div>
       </div>

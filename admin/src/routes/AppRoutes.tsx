@@ -23,6 +23,7 @@ import { SettingsLayout } from '@/features/settings/pages/SettingsLayout'
 import { StaffPage } from '@/features/settings/pages/StaffPage'
 import { StoreSettingsPage } from '@/features/settings/pages/StoreSettingsPage'
 import { ShippingPage } from '@/features/shipping/pages/ShippingPage'
+import { CodReconciliationPage } from '@/features/shipping/pages/CodReconciliationPage'
 import { InventoryItemPage } from '@/features/inventory/pages/InventoryItemPage'
 import { InventoryListPage } from '@/features/inventory/pages/InventoryListPage'
 import { LocationsPage } from '@/features/inventory/pages/LocationsPage'
@@ -106,6 +107,10 @@ export function AppRoutes() {
           </Route>
           <Route element={<ProtectedRoute permission="payments:read" />}>
             <Route path="/payments" element={<PaymentsPage />} />
+            {/* Courier statements are money, so they sit behind the payments
+                permission rather than the shipping one — the operator who
+                reconciles cash is not always the one who prices delivery. */}
+            <Route path="/payments/cod" element={<CodReconciliationPage />} />
           </Route>
           <Route element={<ProtectedRoute permission="customers:read" />}>
             <Route path="/customers" element={<CustomerListPage />} />

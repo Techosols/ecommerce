@@ -102,6 +102,9 @@ export const navigation: NavSection[] = [
         // Receipts a customer sent that nobody has decided about. The one
         // number on this page that means somebody is waiting on the shop.
         badge: 'paymentsToReview',
+        children: [
+          { to: '/payments/cod', label: 'Cash on delivery', permission: 'payments:read' },
+        ],
       },
     ],
   },

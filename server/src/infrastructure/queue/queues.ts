@@ -24,6 +24,8 @@ export const QUEUES = {
   CARTS_ABANDONED_SCAN: 'carts.abandoned_scan',
   ORDER_EXPIRE_UNPAID: 'order.expire_unpaid',
   ANALYTICS_ROLLUP: 'analytics.rollup',
+  /** Asks the courier where the parcels that are still moving have got to. */
+  SHIPPING_POLL_TRACKING: 'shipping.poll_tracking',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -75,6 +77,15 @@ export const JOB_SCHEMAS = {
      * than accumulated, so re-doing a day is free.
      */
     days: z.number().int().positive().max(60).default(3),
+  }),
+  [QUEUES.SHIPPING_POLL_TRACKING]: z.object({
+    /**
+     * How many parcels one run asks about. Bounded because this is one HTTP
+     * request per parcel to somebody else's server: a shop with a bad week and
+     * six hundred open parcels should spread them over runs rather than take a
+     * courier's rate limiter personally.
+     */
+    batchSize: z.number().int().positive().max(500).default(50),
   }),
 } as const satisfies Record<QueueName, z.ZodType>
 
@@ -195,6 +206,19 @@ export const QUEUE_POLICIES: Record<QueueName, QueuePolicy> = {
     // A stale dashboard is visible and not urgent.
     alertOnDeadLetter: false,
   },
+  [QUEUES.SHIPPING_POLL_TRACKING]: {
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: false,
+    // A batch of parcels, each a bounded HTTP call with its own 10s timeout.
+    expireInSeconds: 600,
+    // One worker. The sweep is idempotent, but a second would only ask the
+    // courier the same questions about the same parcels.
+    teamSize: 1,
+    // The next run asks again, and a webhook may answer first. A shipment stuck
+    // in `shipped` shows in the admin long before it is worth waking anybody.
+    alertOnDeadLetter: false,
+  },
 }
 
 /** Cron schedules, in UTC (§8.4). */
@@ -219,13 +243,24 @@ export const QUEUE_SCHEDULES: { queue: QueueName; cron: string; data?: unknown }
   },
   // After the cleanup jobs, so the day is settled before it is counted.
   { queue: QUEUES.ANALYTICS_ROLLUP, cron: '0 5 * * *', data: { days: 3 } },
+  /*
+   * Every fifteen minutes.
+   *
+   * Fast enough that "delivered" reaches the customer's inbox while they still
+   * remember opening the door, slow enough that a shop with fifty parcels in
+   * flight makes two hundred courier calls a day rather than three thousand.
+   * Where the courier has a webhook it arrives sooner and this only catches
+   * what the webhook dropped; with the manual provider the handler returns
+   * immediately, so an unconfigured shop pays nothing for this being scheduled.
+   */
+  { queue: QUEUES.SHIPPING_POLL_TRACKING, cron: '*/15 * * * *', data: { batchSize: 50 } },
 ]
 
 /*
  * Reserved for later phases — added here when their handler lands:
  *   notification.dispatch
  *   inventory.low_stock_scan  inventory.reconcile
- *   payment.check_pending  shipment.delivery_check    webhook.process
+ *   payment.check_pending  webhook.process
  *   webhook.sweep          customer.claim_guest_orders
  *   analytics.ingest       report.generate
  *   cleanup.carts          cleanup.analytics

@@ -105,6 +105,15 @@ export const envSchema = z
      * the first email of an order arrives and the staff copies do not. Turn it
      * on for a provider that wants it (SES, Postmark, your own Postfix).
      */
+    /**
+     * Which courier the shop is connected to.
+     *
+     * `manual` is not "off" — it is the shop as it works without an
+     * integration: staff price delivery with the shop's own rates and paste the
+     * tracking number in by hand. Every capability is declared false, so no
+     * screen offers an action the courier cannot honour.
+     */
+    CARRIER_PROVIDER: z.enum(['manual']).default('manual'),
     SMTP_POOL: bool.default(false),
     SMTP_MAX_CONNECTIONS: z.coerce.number().int().positive().max(20).optional(),
 

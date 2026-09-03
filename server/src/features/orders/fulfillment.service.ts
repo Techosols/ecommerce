@@ -14,6 +14,8 @@ import { createLogger } from '../../infrastructure/logging/logger.js'
 import type { Actor } from '../../shared/auth/actor.js'
 import { DomainRuleError, ERROR_CODES } from '../../shared/errors/index.js'
 import { paymentsService, type PaymentMethod, type Refund } from '../payments/index.js'
+import { carrierService } from '../shipping/carrier.service.js'
+import { codService } from '../shipping/cod.service.js'
 import { shippingService, type ShipmentStatus } from '../shipping/index.js'
 import { ordersRepository as repo } from './orders.repository.js'
 import { ordersService } from './orders.service.js'
@@ -262,10 +264,118 @@ export const fulfillmentService = {
       }
     }
 
-    return shippingService.createShipment({ orderId, ...input }, actor, {
-      order: { email: order.email, orderNumber: order.orderNumber },
-      incrementFulfilled: (orderItemId, quantity) => repo.incrementFulfilled(orderItemId, quantity),
-      afterShipment: (id) => this.syncFulfillmentStatus(id, actor),
+    /**
+     * Ask the courier to take it, if one is connected.
+     *
+     * ── Before the shipment row, on purpose ──────────────────────────────────
+     *
+     * A booking that fails must leave nothing behind: no shipment, no
+     * incremented fulfilled counts, no parcel the system believes has gone. So
+     * the courier is called first and its refusal propagates — the operator is
+     * told the booking failed and can try again, rather than being left with a
+     * shipment that looks real and a courier that has never heard of it.
+     *
+     * ── What the courier says beats what was typed ───────────────────────────
+     *
+     * The tracking number it returns is authoritative: it is the number the
+     * courier will actually answer to. Anything the operator typed is a guess
+     * at best. With no courier connected, `book` returns null and what they
+     * typed is all there is — which is exactly the shop as it worked before.
+     */
+    const booking = await this.bookWithCarrier(order, input)
+
+    const shipment = await shippingService.createShipment(
+      {
+        orderId,
+        ...input,
+        ...(booking
+          ? {
+              trackingNumber: booking.trackingNumber,
+              trackingUrl: booking.trackingUrl ?? input.trackingUrl ?? null,
+            }
+          : {}),
+      },
+      actor,
+      {
+        order: { email: order.email, orderNumber: order.orderNumber },
+        incrementFulfilled: (orderItemId, quantity) =>
+          repo.incrementFulfilled(orderItemId, quantity),
+        afterShipment: (id) => this.syncFulfillmentStatus(id, actor),
+      },
+    )
+
+    if (booking) {
+      await carrierService.attachBooking(shipment.id, carrierService.capabilities().provider, booking)
+    }
+
+    return shipment
+  },
+
+  /**
+   * Turns an order into the consignment a courier wants.
+   *
+   * Returns null when no courier is connected or it cannot book, which is the
+   * signal to carry on exactly as before.
+   */
+  async bookWithCarrier(
+    order: Awaited<ReturnType<typeof ordersService.getRaw>>,
+    input: { items: { orderItemId: string; quantity: number }[]; service?: string | null },
+  ) {
+    if (!carrierService.capabilities().booking) return null
+
+    const detail = await ordersService.detail(order.id)
+    const shipping = detail.addresses.find((address) => address.type === 'shipping')
+    if (!shipping) return null
+
+    const shipped = new Map(input.items.map((item) => [item.orderItemId, item.quantity]))
+    const lines = detail.items.filter((item) => shipped.has(item.id))
+
+    const contents = lines.map((item) => ({
+      description: item.variantTitle
+        ? `${item.productTitle} — ${item.variantTitle}`
+        : item.productTitle,
+      quantity: shipped.get(item.id) ?? item.quantity,
+    }))
+
+    // The weight of what is *in this parcel*, not of the whole order: a partial
+    // shipment is a smaller box, and a courier that quotes on the order's full
+    // weight overcharges for every one of them.
+    const weightGrams = lines.reduce(
+      (total, item) => total + item.weightGrams * (shipped.get(item.id) ?? 0),
+      0,
+    )
+    const valueCents = lines.reduce(
+      (total, item) => total + item.unitPriceCents * (shipped.get(item.id) ?? 0),
+      0,
+    )
+
+    return carrierService.book({
+      orderNumber: order.orderNumber,
+      serviceCode: input.service ?? null,
+      recipient: {
+        name: `${shipping.firstName} ${shipping.lastName}`.trim(),
+        phone: shipping.phone ?? detail.phone,
+        email: detail.email,
+        line1: shipping.line1,
+        line2: shipping.line2,
+        city: shipping.city,
+        region: shipping.region,
+        postalCode: shipping.postalCode,
+        countryCode: shipping.countryCode,
+      },
+      parcel: {
+        weightGrams,
+        contents,
+        valueCents,
+        currency: order.currency,
+      },
+      /**
+       * Only a genuinely unpaid cash-on-delivery order asks the courier to
+       * collect. Sending a non-zero amount for an order already paid by card is
+       * how a customer is charged twice at their own front door.
+       */
+      codAmountCents:
+        order.paymentMethod === 'cod' && order.paymentStatus !== 'paid' ? order.totalCents : 0,
     })
   },
 
@@ -330,6 +440,118 @@ export const fulfillmentService = {
   async refunds(orderId: string) {
     return paymentsService.listRefundsForOrder(orderId)
   },
+
+  // ── Money in, by way of the courier ───────────────────────────────────────
+
+  /**
+   * Imports a courier's cash-on-delivery statement.
+   *
+   * The wiring the COD service cannot do for itself: it owns the statement and
+   * the matching, and asks here what each order is actually owed, because
+   * shipping does not know about orders and must not learn.
+   *
+   * Nothing is marked paid. See `settleCodLine`.
+   */
+  async importCodRemittance(
+    input: {
+      file: Buffer
+      filename: string
+      reference?: string | null
+      statementDate?: Date | null
+      declaredNetCents?: number | null
+      currency?: string | null
+    },
+    actor: Actor,
+  ) {
+    return codService.import(input, { outstandingFor: codOrderLookup }, actor)
+  },
+
+  /**
+   * Records the cash for one reconciled line.
+   *
+   * ── Why one line at a time ────────────────────────────────────────────────
+   *
+   * Because each one confirms an order and commits its stock, and a "settle
+   * everything" button over a parsed spreadsheet is precisely the destructive
+   * bulk action that should not exist. The admin may loop over the matched
+   * lines; every iteration is still a decision the server checked.
+   *
+   * ── Why only matched lines ────────────────────────────────────────────────
+   *
+   * A mismatched line is the finding, not a rounding error to wave through: the
+   * courier says it collected an amount the order does not agree with, and
+   * somebody has to decide which is right. They can still record a payment on
+   * the order directly — with their own name against it — which is exactly the
+   * accountability that settling from here would launder away.
+   */
+  async settleCodLine(lineId: string, actor: Actor) {
+    const line = await codService.getLine(lineId)
+
+    if (line.settled) {
+      throw new DomainRuleError(
+        ERROR_CODES.PAYMENT_ALREADY_SETTLED,
+        'That line has already been recorded against the order',
+      )
+    }
+    if (!line.orderId) {
+      throw new DomainRuleError(
+        ERROR_CODES.DOMAIN_RULE_VIOLATION,
+        'That line does not name an order of ours',
+      )
+    }
+    if (line.matchStatus !== 'matched') {
+      throw new DomainRuleError(
+        ERROR_CODES.DOMAIN_RULE_VIOLATION,
+        line.matchStatus === 'mismatched'
+          ? 'The courier collected a different amount from what this order is owed — record the payment on the order itself, so the difference is somebody’s decision'
+          : 'That line could not be matched to an order',
+      )
+    }
+
+    /*
+     * `provider: 'carrier'` with the line id as the provider payment id.
+     *
+     * That pair is what `settled` is read back from, so the same line cannot be
+     * banked twice — and it is what lets anybody looking at a payment six
+     * months later find the statement it came off.
+     */
+    const payment = await this.recordPayment(
+      line.orderId,
+      {
+        method: 'cod',
+        provider: 'carrier',
+        providerPaymentId: line.id,
+        amountCents: line.collectedCents,
+      },
+      actor,
+    )
+
+    log.info(
+      { lineId, orderId: line.orderId, amountCents: line.collectedCents },
+      'cod line settled',
+    )
+    return payment
+  },
+}
+
+/**
+ * What an order is owed, for the matcher.
+ *
+ * Returns null rather than throwing for an order that no longer exists: a
+ * statement naming a deleted order is a finding to display, not a reason to
+ * abandon the import of the ninety-nine lines around it.
+ */
+async function codOrderLookup(orderId: string) {
+  try {
+    const order = await ordersService.getRaw(orderId)
+    const outstandingCents = await paymentsService.outstandingFor(
+      orderId,
+      order.totalCents - order.refundedTotalCents,
+    )
+    return { outstandingCents, currency: order.currency, orderNumber: order.orderNumber }
+  } catch {
+    return null
+  }
 }
 
 export function outstandingFor(orderId: string, totalCents: number): Promise<number> {

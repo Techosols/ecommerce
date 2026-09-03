@@ -29,6 +29,7 @@ import { expireReservationsHandler } from './inventory/expireReservations.job.js
 import { abandonCartsHandler } from './carts/abandonCarts.job.js'
 import { expireUnpaidOrdersHandler } from './orders/expireUnpaid.job.js'
 import { analyticsRollupHandler } from './analytics/rollup.job.js'
+import { pollTrackingHandler } from './shipping/pollTracking.job.js'
 
 const log = createLogger('jobs')
 
@@ -44,6 +45,7 @@ export async function registerAllJobs(): Promise<void> {
   await register(QUEUES.CARTS_ABANDONED_SCAN, abandonCartsHandler)
   await register(QUEUES.ORDER_EXPIRE_UNPAID, expireUnpaidOrdersHandler)
   await register(QUEUES.ANALYTICS_ROLLUP, analyticsRollupHandler)
+  await register(QUEUES.SHIPPING_POLL_TRACKING, pollTrackingHandler)
 
   await registerDeadLetterWatchers()
   await registerSchedules()

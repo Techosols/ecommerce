@@ -19,6 +19,7 @@ import {
   ValidationError,
 } from '../../shared/errors/index.js'
 import { auditService } from '../audit/index.js'
+import { carrierService } from './carrier.service.js'
 
 const log = createLogger('shipping')
 
@@ -452,6 +453,11 @@ export const shippingService = {
     countryCode: string
     subtotalCents: number
     weightGrams: number
+    /** Passed through to a connected courier, which prices by address. */
+    city?: string | null
+    postalCode?: string | null
+    cashOnDelivery?: boolean
+    currency?: string
   }): Promise<RateQuote[]> {
     const rows = await query<MethodRow>(
       `SELECT m.* FROM shipping_methods m
@@ -463,7 +469,7 @@ export const shippingService = {
       { name: 'shipping.quote' },
     )
 
-    return rows
+    const own = rows
       .map(toMethod)
       .filter((method) => this.weightFits(method, input.weightGrams))
       .map((method) => ({
@@ -474,6 +480,50 @@ export const shippingService = {
         estimatedDaysMin: method.estimatedDaysMin,
         estimatedDaysMax: method.estimatedDaysMax,
       }))
+
+    /**
+     * A connected courier prices the same parcel, and the *cheaper* answer wins
+     * per method.
+     *
+     * ── Why the shop's methods still frame the answer ────────────────────────
+     *
+     * The list a shopper sees is the shop's: its names, its zones, its
+     * free-over-threshold, its ids — because `methodId` is what checkout sends
+     * back and what the order stores, and a courier's service code is not a
+     * method this shop offers. The courier changes what a method *costs*, never
+     * what is on the menu.
+     *
+     * ── Why cheaper rather than "the courier is right" ───────────────────────
+     *
+     * Because a shop's own rate is a promise it has already made — a flat
+     * PKR 200 on the product page, free over PKR 5,000 — and a courier quoting
+     * more does not release it from that. Taking the lower of the two keeps
+     * every promise the shop has made while letting a genuinely cheaper courier
+     * rate through. A shop that wants the courier's price exactly sets its own
+     * method high and lets this do the work.
+     *
+     * `null` covers every reason there is no courier price, and they are all
+     * handled the same way: the shop's own rates, unchanged. Checkout never
+     * depends on a third party being up.
+     */
+    const quoted = await carrierService.quote({
+      destination: {
+        countryCode: input.countryCode.toUpperCase(),
+        city: input.city ?? null,
+        postalCode: input.postalCode ?? null,
+      },
+      weightGrams: input.weightGrams,
+      subtotalCents: input.subtotalCents,
+      currency: input.currency ?? 'USD',
+      cashOnDelivery: input.cashOnDelivery ?? false,
+    })
+    if (!quoted) return own
+
+    const cheapest = Math.min(...quoted.map((quote) => quote.amountCents))
+    return own.map((method) =>
+      // A free method stays free: the shop meant it.
+      method.amountCents === 0 ? method : { ...method, amountCents: Math.min(method.amountCents, cheapest) },
+    )
   },
 
   weightFits(method: ShippingMethod, weightGrams: number): boolean {
@@ -529,6 +579,19 @@ export const shippingService = {
     subtotalCents: number
     weightGrams: number
     methodId: string | null
+    /**
+     * The rest of the destination, and how it will be paid.
+     *
+     * Optional because the public rate lookup has only a country — a shopper
+     * browsing has not typed an address yet. Checkout has, and passes it,
+     * because a courier prices Karachi differently from a village four hours
+     * away and charges more to carry cash. Without these a connected courier
+     * quotes a country, which is not a price anybody should be held to.
+     */
+    city?: string | null
+    postalCode?: string | null
+    cashOnDelivery?: boolean
+    currency?: string
   }): Promise<{ methodId: string | null; name: string | null; amountCents: number }> {
     const options = await this.quote(input)
     if (options.length === 0) {
@@ -680,10 +743,18 @@ export const shippingService = {
    * Moves a shipment along. `shipped` and `delivered` stamp their timestamps,
    * and both are the moments a customer expects an email.
    */
+  /**
+   * Moves a parcel on.
+   *
+   * `actor` is nullable because the courier is not a person. A scan arriving
+   * from a poll or a webhook has nobody behind it, and recording the last
+   * member of staff who touched the order would put a name against a decision
+   * they did not make — which is precisely what an audit trail must not do.
+   */
   async setShipmentStatus(
     id: string,
     status: ShipmentStatus,
-    actor: Actor,
+    actor: Actor | null,
     hooks: { order: { orderId: string; orderNumber: string; email: string } },
   ): Promise<Shipment> {
     const shipment = await this.getShipment(id)
@@ -720,7 +791,7 @@ export const shippingService = {
           trackingNumber: shipment.trackingNumber,
           trackingUrl: shipment.trackingUrl,
         },
-        { aggregateId: hooks.order.orderId, actorUserId: actor.userId },
+        { aggregateId: hooks.order.orderId, ...(actor ? { actorUserId: actor.userId } : {}) },
       )
     }
     if (status === 'delivered') {
@@ -732,7 +803,7 @@ export const shippingService = {
           orderNumber: hooks.order.orderNumber,
           email: hooks.order.email,
         },
-        { aggregateId: hooks.order.orderId, actorUserId: actor.userId },
+        { aggregateId: hooks.order.orderId, ...(actor ? { actorUserId: actor.userId } : {}) },
       )
     }
 

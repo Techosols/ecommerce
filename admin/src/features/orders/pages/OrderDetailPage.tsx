@@ -32,6 +32,8 @@ import {
 } from '../hooks/orders.hooks'
 import { RefundDialog } from '@/features/returns/components/RefundDialog'
 import { useOrderReturns } from '@/features/returns/hooks/returns.hooks'
+import { TrackingTimeline } from '@/features/shipping/components/TrackingTimeline'
+import { useCarrierCapabilities } from '@/features/shipping/hooks/carrier.hooks'
 import { statusTones as returnTones } from '@/features/returns/components/returnLabels'
 import { OrderAnnotationsCard } from '../components/OrderAnnotationsCard'
 import { OrderStatusTriple } from '../components/OrderStatusBadges'
@@ -92,6 +94,9 @@ export function OrderDetailPage() {
   const payments = useOrderPayments(id)
   const shipments = useOrderShipments(id)
   const returns = useOrderReturns(id)
+  // Whether a courier reports scans at all. Cached for the session, so this is
+  // one request for the whole admin rather than one per order opened.
+  const carrier = useCarrierCapabilities()
   const action = useOrderAction(id ?? '')
   const recordPayment = useRecordPayment(id ?? '')
   const createShipment = useCreateShipment(id ?? '')
@@ -330,6 +335,14 @@ export function OrderDetailPage() {
                                 {shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''} ·{' '}
                                 {formatDateTime(shipment.shippedAt ?? shipment.createdAt)}
                               </span>
+                              {/* Only where a courier reports scans: with none
+                                  connected the trail is always empty, and an
+                                  expander that opens onto nothing is worse than
+                                  no expander. */}
+                              <TrackingTimeline
+                                shipmentId={shipment.id}
+                                enabled={Boolean(carrier.data?.tracking)}
+                              />
                             </li>
                           ))}
                         </ul>
