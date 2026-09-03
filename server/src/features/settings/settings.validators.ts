@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { offsetPaginationQuery } from '../../shared/http/pagination.js'
+import { sanitiseRichText } from '../../shared/validation/richText.js'
 import { countryCodeField, emailField, webUrlField } from '../../shared/validation/common.js'
 
 /**
@@ -64,7 +66,19 @@ export const updateSettingsSchema = z
     bankAccountNumber: z.string().trim().max(64).nullable(),
     bankIban: z.string().trim().max(64).nullable(),
     bankSwift: z.string().trim().max(16).nullable(),
-    bankInstructions: z.string().trim().max(1000).nullable(),
+    // Rich text, and sanitised for the same reason a product description is:
+    // it renders on the checkout page, which is the last place to want somebody
+    // else's script running.
+    bankInstructions: z
+      .string()
+      .max(4_000)
+      .transform((value) => sanitiseRichText(value) ?? '')
+      .nullable(),
+
+    // A short list on purpose. This is a staff distribution list, not a
+    // newsletter; past a handful the right answer is a group address at the
+    // mail provider rather than more rows here.
+    adminNotificationEmails: z.array(z.email().max(320)).max(10),
 
     orderReservationHours: z.number().int().min(1).max(2160),
 
@@ -72,3 +86,28 @@ export const updateSettingsSchema = z
     metadata: z.record(z.string(), z.unknown()),
   })
   .partial()
+
+/**
+ * The mail log's filters.
+ *
+ * `status` is the one that matters: "show me everything that failed" is the
+ * question this screen exists to answer, and it should not require reading a
+ * page of successes first.
+ */
+export const emailLogQuery = offsetPaginationQuery.extend({
+  status: z.enum(['queued', 'sending', 'sent', 'failed', 'suppressed', 'disabled']).optional(),
+  to: z.string().trim().max(320).optional(),
+})
+
+/**
+ * A test message, sent by an operator to prove delivery works.
+ *
+ * The address is asked for rather than assumed. Sending to the store contact
+ * address would prove only that the shop can mail itself — which, on a mail
+ * server that delivers locally and refuses to relay, is exactly the case that
+ * looks fine while every customer email is being refused.
+ */
+export const sendTestEmailSchema = z.strictObject({
+  to: z.email().max(320),
+  note: z.string().trim().max(200).optional(),
+})

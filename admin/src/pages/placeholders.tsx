@@ -51,25 +51,6 @@ export function InventoryPage() {
   )
 }
 
-export function PaymentsPage() {
-  return (
-    <PlaceholderPage
-      title="Payments"
-      description="Money taken and money returned, per order. Cash on delivery today; more methods later."
-      planned={[
-        'See the payments recorded against an order',
-        'Record a payment taken outside the storefront',
-        'Issue full and partial refunds, with or without restocking',
-      ]}
-      endpoints={[
-        'GET /admin/orders/:id/payments',
-        'POST /admin/orders/:id/payments',
-        'POST /admin/orders/:id/refunds',
-      ]}
-    />
-  )
-}
-
 export function AnalyticsPage() {
   return (
     <PlaceholderPage

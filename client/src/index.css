@@ -106,3 +106,85 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Rich text from the admin ───────────────────────────────────────────────
+ *
+ * The same rules the admin's editor uses, so what a merchant writes is what a
+ * shopper sees. Kept in step with `admin/src/styles/index.css` — a description
+ * that looks different in the two places is one people stop trusting the editor
+ * for, and then they write it somewhere else and paste it in.
+ *
+ * Safe to render as markup only because the server sanitises this field on
+ * write. See the note at the call site.
+ */
+.rte-content { line-height: 1.65; }
+.rte-content > * + * { margin-top: 0.75em; }
+
+.rte-content h1 { font-size: 1.5rem; font-weight: 600; line-height: 1.25; color: var(--color-ink); }
+.rte-content h2 { font-size: 1.25rem; font-weight: 600; line-height: 1.3; color: var(--color-ink); }
+.rte-content h3 { font-size: 1.125rem; font-weight: 600; color: var(--color-ink); }
+.rte-content h4,
+.rte-content h5,
+.rte-content h6 { font-weight: 600; color: var(--color-ink); }
+
+.rte-content ul { list-style: disc; padding-left: 1.5em; }
+.rte-content ol { list-style: decimal; padding-left: 1.5em; }
+.rte-content li { margin-top: 0.25em; }
+
+.rte-content a {
+  color: var(--color-brand-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rte-content blockquote {
+  border-left: 3px solid var(--color-line);
+  padding-left: 0.875em;
+}
+
+.rte-content hr { border: 0; border-top: 1px solid var(--color-line); margin: 1.25em 0; }
+
+.rte-content code {
+  background: var(--color-surface-sunken, #f5f5f5);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+.rte-content pre {
+  background: var(--color-surface-sunken, #f5f5f5);
+  border-radius: 0.5rem;
+  padding: 0.75em 0.875em;
+  overflow-x: auto;
+}
+.rte-content pre code { background: none; padding: 0; }
+
+.rte-content img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+
+.rte-content iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 0.5rem;
+}
+
+/* Tables scroll rather than forcing the page sideways on a phone. */
+.rte-content table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.rte-content th,
+.rte-content td {
+  border: 1px solid var(--color-line);
+  padding: 0.4em 0.6em;
+  text-align: left;
+  vertical-align: top;
+}
+.rte-content th { font-weight: 600; }
+
+.rte-align-left { text-align: left; }
+.rte-align-center { text-align: center; }
+.rte-align-right { text-align: right; }
+.rte-align-justify { text-align: justify; }

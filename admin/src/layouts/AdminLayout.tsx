@@ -10,6 +10,7 @@ import {
   useNotificationRealtimeSync,
   useUnreadCount,
 } from '@/features/notifications/notifications.hooks'
+import { usePendingProofCount } from '@/features/payments'
 import { navItemsByPath } from '@/routes/navigation'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { Sidebar } from './Sidebar'
@@ -50,6 +51,9 @@ export function AdminLayout() {
   const unread = useUnreadCount()
   const overview = useDashboardOverview()
 
+  // The server's own count of receipts awaiting review, for the badge.
+  const proofsToReview = usePendingProofCount()
+
   // Every page gets the notification toast, not just the dashboard.
   useNotificationRealtimeSync((payload) => {
     toast({
@@ -64,6 +68,7 @@ export function AdminLayout() {
     ...(counters ? { pendingOrders: counters.awaitingFulfillment } : {}),
     ...(counters ? { lowStock: counters.lowStock + counters.outOfStock } : {}),
     ...(unread.data ? { unreadNotifications: unread.data.count } : {}),
+    ...(proofsToReview === undefined ? {} : { paymentsToReview: proofsToReview }),
   }
 
   return (

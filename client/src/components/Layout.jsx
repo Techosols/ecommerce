@@ -1,20 +1,30 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router-dom'
-import { Menu, Search, ShoppingBag, User, X } from 'lucide-react'
+import { ChevronDown, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useStoreSettings } from '@/features/settings/useSettings'
-import { useCollections } from '@/features/catalogue/hooks/catalogue.hooks'
+import { useCategories, useCollections } from '@/features/catalogue/hooks/catalogue.hooks'
 import { cartCount, useCart } from '@/features/cart/hooks/cart.hooks'
 
 /**
  * The frame every page sits in.
  *
- * The navigation is built from **collections**, not categories. The two answer
- * different questions: a category is where a product *files* — one each, in a
- * deep tree the merchant maintains, which with a seeded taxonomy runs to
- * thousands of mostly-empty nodes — while a collection is where products
- * *appear together*, because somebody decided they should. A shopfront wants
- * the second.
+ * ── Two ways to browse, in order of prominence ───────────────────────────────
+ *
+ * The main navigation is **collections**: a collection is where products appear
+ * together because somebody decided they should, which is what a shopper
+ * arriving cold wants. **Categories** sit behind one menu beside them — the
+ * merchant's taxonomy, where every product files exactly once. With a seeded
+ * taxonomy that tree runs to thousands of mostly-empty nodes, so only the top
+ * level is a menu; each category page then offers its own children, and the
+ * tree is walked a level at a time rather than flattened into the header.
+ *
+ * ── What the shop shows is what the admin set ────────────────────────────────
+ *
+ * The name, the logo, the contact address and the support link all come from
+ * store settings. Nothing here is hard-coded, and nothing is invented when a
+ * setting is empty: an absent logo means the name is the wordmark, an absent
+ * support URL means that link is not offered at all.
  */
 export function Layout() {
   const settings = useStoreSettings()
@@ -30,7 +40,7 @@ export function Layout() {
       </a>
 
       <Header
-        storeName={settings?.storeName ?? 'Shop'}
+        settings={settings}
         isMenuOpen={isMenuOpen}
         onToggleMenu={() => setIsMenuOpen((open) => !open)}
       />
@@ -39,27 +49,43 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <Footer storeName={settings?.storeName ?? 'Shop'} contactEmail={settings?.contactEmail} />
+      <Footer settings={settings} />
     </div>
   )
 }
 
-function Header({ storeName, isMenuOpen, onToggleMenu }) {
+function Header({ settings, isMenuOpen, onToggleMenu }) {
+  const storeName = settings?.storeName ?? 'Shop'
   const { data: collections } = useCollections()
+  const { data: categories } = useCategories()
   const { data: cart } = useCart()
   const items = cartCount(cart)
   const nav = (collections ?? []).slice(0, 5)
+  const topCategories = categories ?? []
 
   return (
     <header className="border-line bg-surface/95 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
-        {/* Truncates rather than pushing the header wider: a long store name
-            must not be the reason a phone scrolls sideways. */}
-        <Link to="/" className="font-display text-ink min-w-0 truncate text-xl font-semibold">
-          {storeName}
+        {/* The shop's own logo when it has uploaded one. `alt` is the store
+            name, not "logo": a screen reader announcing the wordmark should
+            hear what the others read. */}
+        <Link to="/" className="flex min-w-0 items-center gap-2">
+          {settings?.logoUrl ? (
+            <img
+              src={settings.logoUrl}
+              alt={storeName}
+              className="h-8 w-auto max-w-[10rem] object-contain"
+            />
+          ) : (
+            // Truncates rather than pushing the header wider: a long store
+            // name must not be the reason a phone scrolls sideways.
+            <span className="font-display text-ink truncate text-xl font-semibold">
+              {storeName}
+            </span>
+          )}
         </Link>
 
-        <nav aria-label="Collections" className="ml-4 hidden items-center gap-1 md:flex">
+        <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
           {nav.map((collection) => (
             <NavLink
               key={collection.handle}
@@ -74,6 +100,8 @@ function Header({ storeName, isMenuOpen, onToggleMenu }) {
               {collection.title}
             </NavLink>
           ))}
+
+          {topCategories.length > 0 ? <CategoryMenu categories={topCategories} /> : null}
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
@@ -115,7 +143,7 @@ function Header({ storeName, isMenuOpen, onToggleMenu }) {
       </div>
 
       {isMenuOpen ? (
-        <nav aria-label="Collections" className="border-line border-t px-4 py-2 md:hidden">
+        <nav aria-label="Main" className="border-line border-t px-4 py-2 md:hidden">
           {nav.map((collection) => (
             <NavLink
               key={collection.handle}
@@ -126,16 +154,98 @@ function Header({ storeName, isMenuOpen, onToggleMenu }) {
               {collection.title}
             </NavLink>
           ))}
+
+          {topCategories.length > 0 ? (
+            <>
+              <p className="text-faint px-3 pt-3 pb-1 text-xs font-semibold tracking-wide uppercase">
+                Shop by category
+              </p>
+              {topCategories.map((category) => (
+                <NavLink
+                  key={category.handle}
+                  to={`/categories/${category.handle}`}
+                  onClick={onToggleMenu}
+                  className="text-ink-soft hover:bg-sunken block rounded-md px-3 py-2 text-sm font-medium"
+                >
+                  {category.name}
+                </NavLink>
+              ))}
+            </>
+          ) : null}
+
           <NavLink
             to="/account/orders"
             onClick={onToggleMenu}
-            className="text-ink-soft hover:bg-sunken block rounded-md px-3 py-2 text-sm font-medium"
+            className="border-line text-ink-soft hover:bg-sunken mt-2 block border-t px-3 py-2 text-sm font-medium"
           >
             Your orders
           </NavLink>
         </nav>
       ) : null}
     </header>
+  )
+}
+
+/**
+ * The categories menu.
+ *
+ * Only the top level, because the tree below it can be very deep and a menu is
+ * not a place to render a taxonomy. Each entry leads to a category page, which
+ * offers its own children — so the depth is walked rather than displayed.
+ *
+ * ── Click, not hover ────────────────────────────────────────────────────────
+ *
+ * Opening on hover as well as on click means a mouse user hovers the trigger
+ * (which opens it), clicks (which toggles it shut), and sees the menu flash
+ * closed under their cursor. Hover-opening also has nothing to say to a phone,
+ * where there is no hover at all, so the menu would work differently on the
+ * device most of these shoppers are using.
+ *
+ * One interaction, the same everywhere: click to open, click, Escape or moving
+ * focus away to close.
+ *
+ * Closing on blur rather than on a document listener: the panel and its trigger
+ * live in one container, so focus leaving the container is exactly the moment
+ * it should shut, and that works for the keyboard as well as the mouse.
+ */
+function CategoryMenu({ categories }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div
+      className="relative"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false)
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        className="text-ink-soft hover:bg-sunken flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+      >
+        Categories
+        <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open ? (
+        <div className="border-line bg-surface shadow-card absolute top-full left-0 z-50 max-h-[70vh] w-56 overflow-y-auto rounded-lg border py-1">
+          {categories.map((category) => (
+            <Link
+              key={category.handle}
+              to={`/categories/${category.handle}`}
+              onClick={() => setOpen(false)}
+              className="text-ink-soft hover:bg-sunken hover:text-ink block px-3 py-2 text-sm"
+            >
+              {category.name}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -182,7 +292,9 @@ function HeaderSearch() {
   )
 }
 
-function Footer({ storeName, contactEmail }) {
+function Footer({ settings }) {
+  const storeName = settings?.storeName ?? 'Shop'
+
   return (
     <footer className="border-line bg-surface mt-16 border-t">
       <div className="text-muted mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -193,9 +305,26 @@ function Footer({ storeName, contactEmail }) {
           <Link to="/orders/lookup" className="hover:text-ink">
             Track an order
           </Link>
-          {contactEmail ? (
-            <a href={`mailto:${contactEmail}`} className="text-brand-600 hover:underline">
-              {contactEmail}
+          {/* Offered only when the shop actually takes bank transfers. A link
+              to a payment method that is switched off is a dead end. */}
+          {settings?.bankTransferEnabled ? (
+            <Link to="/pay/bank-transfer" className="hover:text-ink">
+              Pay by bank transfer
+            </Link>
+          ) : null}
+          {settings?.supportUrl ? (
+            <a
+              href={settings.supportUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="hover:text-ink"
+            >
+              Help
+            </a>
+          ) : null}
+          {settings?.contactEmail ? (
+            <a href={`mailto:${settings.contactEmail}`} className="text-brand-600 hover:underline">
+              {settings.contactEmail}
             </a>
           ) : null}
         </span>

@@ -4,6 +4,8 @@ import { Pagination } from '@/components/ui/Pagination'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/states/EmptyState'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
+import { EVENTS } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { ProductCard } from '../components/ProductCard'
 import { ProductGridSkeleton } from './ProductListPage'
 import { useCollection, useProducts } from '../hooks/catalogue.hooks'
@@ -29,6 +31,11 @@ export function CollectionPage() {
   const collection = useCollection(handle)
   const products = useProducts({ page, limit: PER_PAGE, collection: handle })
 
+  useTrackOnce(EVENTS.COLLECTION_VIEWED, collection.data ? handle : null, {
+    handle,
+    title: collection.data?.title,
+  })
+
   function setPage(next) {
     const updated = new URLSearchParams(params)
     updated.set('page', String(next))
@@ -48,7 +55,14 @@ export function CollectionPage() {
           <header className="flex flex-col gap-3">
             <h1 className="text-3xl sm:text-4xl">{collection.data.title}</h1>
             {collection.data.description ? (
-              <p className="text-muted max-w-2xl text-lg">{collection.data.description}</p>
+              // HTML, written in the admin's editor. The server sanitises it
+              // against a fixed allowlist on the way in, so what arrives here
+              // cannot carry a script, an event handler or a stylesheet — see
+              // `shared/validation/richText.ts` on the server for the list.
+              <div
+                className="rte-content text-muted max-w-2xl text-lg"
+                dangerouslySetInnerHTML={{ __html: collection.data.description }}
+              />
             ) : null}
           </header>
         ) : null}

@@ -6,22 +6,35 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
 import { ProductCard } from '../components/ProductCard'
 import { ProductGridSkeleton } from './ProductListPage'
+import { EVENTS } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { useCategories, useCategory, useProducts } from '../hooks/catalogue.hooks'
-import { findChildren } from '../categoryTree'
+import { findCategory } from '../categoryTree'
 
 const PER_PAGE = 12
 
 /**
- * One category, its children, and what is in it.
+ * One category, its products, and the way further down.
  *
- * Two requests rather than one, because they answer different questions and
- * change at different rates: the category itself (with the breadcrumb the
- * server assembles) is cached for minutes, while the products in it carry
- * live availability and are not.
+ * ── Why a category page is not just a collection page ────────────────────────
  *
- * The child categories are read out of the cached tree rather than fetched:
- * `/storefront/categories/:handle` returns the node and its breadcrumb but not
- * its children, and the tree is already in hand.
+ * A category is a node in a tree the merchant maintains, and a shopper standing
+ * on one needs two things a flat listing does not give them: where they are,
+ * and where they can go next. So this page carries the breadcrumb the server
+ * builds — the trail back to the root — and the category's own children as
+ * links, which is what makes a deep taxonomy walkable a level at a time instead
+ * of collapsing into a menu with a thousand entries.
+ *
+ * ── Two requests, on purpose ─────────────────────────────────────────────────
+ *
+ * The category and its products change at completely different rates. The
+ * category is the merchant's structure and is cached for ten minutes; the
+ * products carry live availability and are not cached at all, because somebody
+ * looking at a size that has just sold out should find that out here.
+ *
+ * The children come from the tree rather than from the detail response, which
+ * returns the node without them. One tree fetch is shared with the header
+ * navigation, so walking down three levels costs no extra requests.
  */
 export function CategoryPage() {
   const { handle } = useParams()
@@ -32,7 +45,17 @@ export function CategoryPage() {
   const tree = useCategories()
   const products = useProducts({ page, limit: PER_PAGE, category: handle })
 
-  const children = findChildren(tree.data ?? [], handle)
+  // The server's vocabulary has no `category_viewed`, and inventing one would
+  // be a 422. A category page is a collection of products being browsed, which
+  // is what this event means — the properties say which kind it was.
+  useTrackOnce(EVENTS.COLLECTION_VIEWED, category.data ? handle : null, {
+    kind: 'category',
+    handle,
+    name: category.data?.name,
+  })
+
+  const node = tree.data ? findCategory(tree.data, handle) : null
+  const children = node?.children ?? []
 
   function setPage(next) {
     const updated = new URLSearchParams(params)
@@ -49,16 +72,30 @@ export function CategoryPage() {
         onRetry={() => void category.refetch()}
         fallback={<Skeleton className="h-16 w-2/3" />}
       >
-        {category.data ? <CategoryHeader category={category.data} /> : null}
+        {category.data ? (
+          <header className="flex flex-col gap-3">
+            <Breadcrumb trail={category.data.breadcrumb ?? []} />
+            <h1 className="text-3xl sm:text-4xl">{category.data.name}</h1>
+            {category.data.description ? (
+              // HTML from the admin's rich text editor. Sanitised server side
+              // against a fixed allowlist on the way in, which is what makes
+              // rendering it here safe.
+              <div
+                className="rte-content text-muted max-w-2xl text-lg"
+                dangerouslySetInnerHTML={{ __html: category.data.description }}
+              />
+            ) : null}
+          </header>
+        ) : null}
       </QueryBoundary>
 
       {children.length > 0 ? (
-        <nav aria-label="Subcategories" className="flex flex-wrap gap-2">
+        <nav aria-label="Categories within this one" className="flex flex-wrap gap-2">
           {children.map((child) => (
             <Link
               key={child.handle}
               to={`/categories/${child.handle}`}
-              className="border-line bg-surface text-ink-soft hover:border-brand-300 hover:text-brand-700 rounded-full border px-3.5 py-1.5 text-sm transition-colors"
+              className="border-line bg-surface text-ink hover:border-brand-300 hover:text-brand-700 rounded-full border px-3.5 py-1.5 text-sm transition-colors"
             >
               {child.name}
             </Link>
@@ -72,24 +109,27 @@ export function CategoryPage() {
         onRetry={() => void products.refetch()}
         fallback={<ProductGridSkeleton />}
       >
-        {(products.data?.items ?? []).length === 0 ? (
+        {products.data?.items.length === 0 ? (
           <EmptyState
             icon={<PackageSearch className="size-6" />}
-            title="Nothing in here yet"
+            title="Nothing here yet"
             description={
               children.length > 0
-                ? 'Try one of the subcategories above.'
-                : 'This category has no products at the moment.'
+                ? 'This part of the shop is organised into the groups above — try one of those.'
+                : 'Nothing is filed under this category at the moment. Have a look at the rest of the shop.'
             }
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {products.data.items.map((product) => (
-                <ProductCard key={product.id} product={product} />
+            <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+              {products.data?.items.map((product) => (
+                <ProductCard key={product.handle} product={product} />
               ))}
             </div>
-            <Pagination pagination={products.data?.pagination} onPageChange={setPage} />
+
+            {products.data?.pagination ? (
+              <Pagination pagination={products.data.pagination} onChange={setPage} />
+            ) : null}
           </>
         )}
       </QueryBoundary>
@@ -97,33 +137,42 @@ export function CategoryPage() {
   )
 }
 
-function CategoryHeader({ category }) {
-  // The breadcrumb includes the category itself as its last entry, so the tail
-  // is dropped rather than rendered as a link to the page you are on.
-  const ancestors = (category.breadcrumb ?? []).slice(0, -1)
+/**
+ * The trail back to the root.
+ *
+ * The last entry is where you are, so it is text rather than a link — a
+ * breadcrumb whose final crumb navigates to the page you are on is a control
+ * that appears to do something and does nothing.
+ */
+function Breadcrumb({ trail }) {
+  if (trail.length <= 1) return null
 
   return (
-    <header className="flex flex-col gap-3">
-      {ancestors.length > 0 ? (
-        <nav aria-label="Breadcrumb" className="text-muted flex flex-wrap items-center gap-1 text-sm">
+    <nav aria-label="Breadcrumb">
+      <ol className="text-muted flex flex-wrap items-center gap-1 text-sm">
+        <li>
           <Link to="/products" className="hover:text-ink">
             Shop
           </Link>
-          {ancestors.map((entry) => (
-            <span key={entry.handle} className="flex items-center gap-1">
-              <ChevronRight className="size-3.5" aria-hidden="true" />
-              <Link to={`/categories/${entry.handle}`} className="hover:text-ink">
-                {entry.name}
-              </Link>
-            </span>
-          ))}
-        </nav>
-      ) : null}
-
-      <h1 className="text-3xl sm:text-4xl">{category.name}</h1>
-      {category.description ? (
-        <p className="text-muted max-w-2xl text-lg">{category.description}</p>
-      ) : null}
-    </header>
+        </li>
+        {trail.map((entry, index) => {
+          const last = index === trail.length - 1
+          return (
+            <li key={entry.handle} className="flex items-center gap-1">
+              <ChevronRight className="text-faint size-3.5" aria-hidden="true" />
+              {last ? (
+                <span aria-current="page" className="text-ink">
+                  {entry.name}
+                </span>
+              ) : (
+                <Link to={`/categories/${entry.handle}`} className="hover:text-ink">
+                  {entry.name}
+                </Link>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
   )
 }

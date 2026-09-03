@@ -46,6 +46,7 @@ function settings(overrides: Partial<StoreSettings> = {}): StoreSettings {
     bankIban: null,
     bankSwift: null,
     bankInstructions: null,
+    adminNotificationEmails: [],
     codMaxOpenOrders: null,
     orderReservationHours: 192,
     logoMediaId: null,

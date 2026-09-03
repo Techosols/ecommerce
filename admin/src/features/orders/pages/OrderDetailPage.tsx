@@ -37,6 +37,7 @@ import { OrderAnnotationsCard } from '../components/OrderAnnotationsCard'
 import { OrderStatusTriple } from '../components/OrderStatusBadges'
 import { OrderTimeline } from '../components/OrderTimeline'
 import { OrderTotalsCard } from '../components/OrderTotalsCard'
+import { OrderProofsCard } from '@/features/payments/components/OrderProofsCard'
 import type { OrderAddress, OrderDetail, OrderItem } from '../types/orders.types'
 
 /** What is left to ship on a line, once shipped and refunded units are taken off. */
@@ -166,6 +167,10 @@ export function OrderDetailPage() {
               <ItemsCard order={order} />
 
               <OrderTotalsCard order={order} />
+
+              {/* Renders itself away unless this order was to be paid by bank
+                  transfer, so it never appears as a blank card on a COD order. */}
+              <OrderProofsCard orderId={order.id} paymentMethod={order.paymentMethod} />
 
               {can('payments:read') ? (
                 <Card>

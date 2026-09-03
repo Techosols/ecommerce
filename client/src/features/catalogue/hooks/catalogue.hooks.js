@@ -7,6 +7,8 @@ export const catalogueKeys = {
   product: (handle) => ['catalogue', 'product', handle],
   collections: () => ['catalogue', 'collections'],
   collection: (handle) => ['catalogue', 'collection', handle],
+  categories: () => ['catalogue', 'categories'],
+  category: (handle) => ['catalogue', 'category', handle],
 }
 
 /**
@@ -58,6 +60,30 @@ export function useCollection(handle) {
   return useQuery({
     queryKey: catalogueKeys.collection(handle),
     queryFn: () => catalogueApi.collection(handle),
+    enabled: Boolean(handle),
+    staleTime: 10 * 60 * 1000,
+  })
+}
+
+/**
+ * The category tree, for the navigation.
+ *
+ * Held for a long time and shared by every page that needs it — the header menu
+ * and each category page ask the same query, so walking down a tree costs one
+ * request for the whole session rather than one per level.
+ */
+export function useCategories() {
+  return useQuery({
+    queryKey: catalogueKeys.categories(),
+    queryFn: () => catalogueApi.categories(),
+    staleTime: 10 * 60 * 1000,
+  })
+}
+
+export function useCategory(handle) {
+  return useQuery({
+    queryKey: catalogueKeys.category(handle),
+    queryFn: () => catalogueApi.category(handle),
     enabled: Boolean(handle),
     staleTime: 10 * 60 * 1000,
   })

@@ -7,6 +7,8 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
 import { availabilityLabel, formatMoney, hasDiscount } from '@/lib/format'
 import { messageOf } from '@/lib/api'
+import { EVENTS } from '@/lib/analytics'
+import { useTrackOnce } from '@/lib/useTrack'
 import { useAddToCart } from '@/features/cart/hooks/cart.hooks'
 import { useProduct } from '../hooks/catalogue.hooks'
 import { OptionPicker } from '../components/OptionPicker'
@@ -35,6 +37,14 @@ import {
 export function ProductPage() {
   const { handle } = useParams()
   const query = useProduct(handle)
+
+  // Keyed on the handle, so the view is counted once per product however many
+  // times the page re-renders — and not at all until the product has arrived.
+  useTrackOnce(EVENTS.PRODUCT_VIEWED, query.data ? handle : null, {
+    handle,
+    title: query.data?.title,
+    price: query.data?.priceRange?.min?.amount,
+  })
 
   return (
     <QueryBoundary
@@ -141,9 +151,22 @@ function ProductView({ product }) {
             {product.description ? (
               <div className="border-line border-t pt-5">
                 <h2 className="text-ink mb-2 text-base font-semibold">About this</h2>
-                <p className="text-muted leading-relaxed whitespace-pre-line">
-                  {product.description}
-                </p>
+                {/*
+                  Rendered as markup, which is safe here for one specific
+                  reason: the server sanitises this field on write against an
+                  allowlist (`shared/validation/richText.ts`), so what reaches
+                  the browser cannot contain a script, an event handler, inline
+                  CSS, or an iframe pointing anywhere but a video host.
+
+                  That guarantee lives on the server on purpose. If this ever
+                  renders a description that did NOT come through that
+                  sanitiser — a second API, an import, a cached document
+                  written before it existed — this line becomes stored XSS.
+                */}
+                <div
+                  className="rte-content text-muted"
+                  dangerouslySetInnerHTML={{ __html: product.description }}
+                />
               </div>
             ) : null}
 

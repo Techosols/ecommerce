@@ -8,6 +8,7 @@ import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Switch } from '@/components/ui/Switch'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { Textarea } from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/toast.context'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
@@ -187,12 +188,12 @@ function CollectionDetailView({
               </Field>
 
               <Field label="Description">
-                <Textarea
-                  rows={3}
-                  maxLength={2000}
+                <RichTextEditor
                   value={form.values.description}
                   disabled={!canWrite}
-                  onChange={(event) => form.setValue('description', event.target.value)}
+                  aria-label="Description"
+                  minHeight="10rem"
+                  onChange={(html) => form.setValue('description', html)}
                 />
               </Field>
 

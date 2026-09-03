@@ -13,6 +13,8 @@ import { z } from 'zod'
 
 export const QUEUES = {
   EMAIL_SEND: 'email.send',
+  /** Releases messages a dead worker left holding the `sending` claim. */
+  EMAIL_RECOVER_STUCK: 'email.recover_stuck',
   CLEANUP_IDEMPOTENCY: 'cleanup.idempotency',
   CLEANUP_EVENTS: 'cleanup.events',
   CLEANUP_SESSIONS: 'cleanup.sessions',
@@ -33,6 +35,15 @@ export function deadLetterName(queue: QueueName): string {
 
 export const JOB_SCHEMAS = {
   [QUEUES.EMAIL_SEND]: z.object({ emailMessageId: z.uuid() }),
+  [QUEUES.EMAIL_RECOVER_STUCK]: z.object({
+    /**
+     * Well outside a message's working life — enqueued on creation, a
+     * two-minute visibility timeout, five retries at backing-off delays. A row
+     * still `sending` after this is abandoned, not busy.
+     */
+    stuckAfterMinutes: z.number().int().positive().max(1440).default(30),
+    batchSize: z.number().int().positive().max(1000).default(100),
+  }),
   [QUEUES.CLEANUP_IDEMPOTENCY]: z.object({}).default({}),
   [QUEUES.CLEANUP_EVENTS]: z.object({ retentionDays: z.number().int().positive().default(365) }),
   [QUEUES.CLEANUP_SESSIONS]: z.object({
@@ -89,6 +100,16 @@ export const QUEUE_POLICIES: Record<QueueName, QueuePolicy> = {
     expireInSeconds: 120,
     teamSize: 5,
     alertOnDeadLetter: true,
+  },
+  [QUEUES.EMAIL_RECOVER_STUCK]: {
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: false,
+    expireInSeconds: 120,
+    teamSize: 1,
+    // The next tick sweeps whatever this one missed, so a failed run is not
+    // worth waking anybody for.
+    alertOnDeadLetter: false,
   },
   [QUEUES.CLEANUP_IDEMPOTENCY]: {
     retryLimit: 2,
@@ -178,6 +199,9 @@ export const QUEUE_POLICIES: Record<QueueName, QueuePolicy> = {
 
 /** Cron schedules, in UTC (§8.4). */
 export const QUEUE_SCHEDULES: { queue: QueueName; cron: string; data?: unknown }[] = [
+  // Often, because what it is rescuing is somebody's order confirmation. Ten
+  // minutes late is a customer who wondered; the alternative is never.
+  { queue: QUEUES.EMAIL_RECOVER_STUCK, cron: '*/10 * * * *' },
   { queue: QUEUES.CLEANUP_IDEMPOTENCY, cron: '0 4 * * *' },
   { queue: QUEUES.CLEANUP_EVENTS, cron: '30 4 * * *', data: { retentionDays: 365 } },
   { queue: QUEUES.CLEANUP_SESSIONS, cron: '15 4 * * *', data: { loginAttemptRetentionDays: 90 } },

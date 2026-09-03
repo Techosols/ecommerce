@@ -22,8 +22,15 @@ export interface TagsInputProps {
  * field removes the last tag, which is the one interaction that makes a chip
  * list feel like a text field rather than a widget.
  *
- * The limits mirror the server's schema (50 tags, 40 characters each) so the
- * field cannot compose a request the API will reject.
+ * The limits mirror the server's schema so the field cannot compose a request
+ * the API will reject — and the caller sets them, because "50 tags of 40
+ * characters" is right for product tags and wrong for a list of email
+ * addresses, which are routinely longer than forty characters and capped at ten.
+ *
+ * An over-long entry is **refused, not truncated**. Silently cutting one to fit
+ * turns `accounts.payable@somewhere-long.com` into an address that is not
+ * anybody's, which the server then rejects — so the whole save fails and the
+ * operator is left looking at a list they believe they just saved.
  */
 export function TagsInput({
   value,
@@ -37,18 +44,27 @@ export function TagsInput({
 }: TagsInputProps) {
   const field = useFieldControl()
   const [draft, setDraft] = useState('')
+  const [rejected, setRejected] = useState<string | null>(null)
   const isInvalid = invalid ?? field?.invalid ?? false
 
   function commit(raw: string) {
-    const tag = raw.trim().slice(0, maxLength)
+    const tag = raw.trim()
     if (!tag) return
+    if (tag.length > maxLength) {
+      setRejected(`That is longer than ${maxLength} characters.`)
+      return
+    }
     // Case-insensitive duplicate check: "Vegan" and "vegan" are one tag to a
     // shopper filtering by it.
     if (value.some((existing) => existing.toLowerCase() === tag.toLowerCase())) {
       setDraft('')
       return
     }
-    if (value.length >= maxTags) return
+    if (value.length >= maxTags) {
+      setRejected(`You can add ${maxTags} at most.`)
+      return
+    }
+    setRejected(null)
     onChange([...value, tag])
     setDraft('')
   }
@@ -64,7 +80,7 @@ export function TagsInput({
     }
   }
 
-  return (
+  const box = (
     <div
       className={cn(
         controlBase,
@@ -97,9 +113,11 @@ export function TagsInput({
         aria-invalid={isInvalid || undefined}
         value={draft}
         disabled={disabled || value.length >= maxTags}
-        maxLength={maxLength}
-        placeholder={value.length >= maxTags ? `Limit of ${maxTags} tags reached` : placeholder}
-        onChange={(event) => setDraft(event.target.value)}
+        placeholder={value.length >= maxTags ? `Limit of ${maxTags} reached` : placeholder}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          setRejected(null)
+        }}
         onKeyDown={handleKeyDown}
         // Committing on blur too, so a tag typed and abandoned is not silently
         // lost when the operator clicks Save.
@@ -107,5 +125,14 @@ export function TagsInput({
         className="placeholder:text-faint min-w-40 flex-1 bg-transparent text-sm outline-none"
       />
     </div>
+  )
+
+  return rejected ? (
+    <div className="flex flex-col gap-1">
+      {box}
+      <p className="text-danger text-xs">{rejected}</p>
+    </div>
+  ) : (
+    box
   )
 }

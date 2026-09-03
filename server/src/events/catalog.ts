@@ -354,6 +354,24 @@ export const EVENT_SCHEMAS = {
     orderId: z.uuid(),
     reason: z.string().nullable(),
   }),
+  /**
+   * A customer sent a receipt for a bank transfer and is waiting on the shop.
+   *
+   * Carries the *claim* as the customer typed it, so a subscriber can put it in
+   * an email without another read — never the screenshot, which does not belong
+   * in an event payload and cannot travel usefully in a message anyway.
+   */
+  'payment.proof_submitted': z.object({
+    proofId: z.uuid(),
+    orderId: z.uuid(),
+    orderNumber: z.string(),
+    email: z.email(),
+    totalCents: z.number().int().positive(),
+    currency: z.string(),
+    claimedSenderName: z.string(),
+    claimedSenderBank: z.string(),
+    claimedAccountLast4: z.string().nullable(),
+  }),
   'payment.refunded': z.object({
     refundId: z.uuid(),
     paymentId: z.uuid(),
@@ -481,6 +499,7 @@ export const EVENT_AGGREGATES: Record<EventName, string> = {
   'payment.created': 'order',
   'payment.succeeded': 'order',
   'payment.failed': 'order',
+  'payment.proof_submitted': 'order',
   'payment.refunded': 'order',
   'shipment.created': 'order',
   'shipment.shipped': 'order',

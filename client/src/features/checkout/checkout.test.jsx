@@ -28,6 +28,11 @@ let mock
 
 beforeEach(() => {
   mock = apiMock().install()
+  // Checkout sits inside `AuthProvider` in the real app, and now reads it: the
+  // shop can require an account to check out, and this page sends somebody to
+  // sign in rather than letting them fill the whole form in and be refused at
+  // the end. Every test below renders with `auth: true` and no mocked refresh,
+  // which is exactly a guest.
   // Placing mints one with `crypto.randomUUID`; jsdom has it, but pinning it
   // makes "the same key on a retry" something a test can actually assert.
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('11111111-2222-4333-8444-555555555555')
@@ -54,7 +59,7 @@ describe('CheckoutPage', () => {
   it('sends people back to the basket rather than checking out nothing', async () => {
     mock.on('GET', '/storefront/cart', cart({ lines: [] }))
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
 
     // Navigate renders nothing, so the absence of the form is the assertion.
     await waitFor(() =>
@@ -66,7 +71,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
 
     await user.type(screen.getByLabelText(/^First name/), 'Ada')
@@ -81,7 +86,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
 
@@ -99,7 +104,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
 
@@ -119,7 +124,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
     await waitFor(() => expect(mock.callsTo('GET', '/checkout/preview').length).toBeGreaterThan(0))
@@ -136,7 +141,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
 
@@ -158,7 +163,7 @@ describe('CheckoutPage', () => {
       .on('GET', '/storefront/cart', cart())
       .on('GET', '/checkout/preview', checkoutQuote({ shippingOptions: [], purchasable: false }))
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user, { country: 'AQ' })
 
@@ -185,7 +190,7 @@ describe('CheckoutPage', () => {
           }),
     )
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
     await screen.findByRole('radio', { name: /Standard delivery/ })
@@ -200,7 +205,7 @@ describe('CheckoutPage', () => {
     const user = userEvent.setup()
     mock.on('GET', '/storefront/cart', cart()).on('GET', '/checkout/preview', checkoutQuote())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     // Enough for a quote, not enough to post to.
     await user.type(screen.getByLabelText(/^Country/), 'GB')
@@ -219,7 +224,7 @@ describe('CheckoutPage', () => {
       .on('GET', '/checkout/preview', checkoutQuote())
       .on('POST', '/storefront/checkout', order())
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
     await screen.findByRole('radio', { name: /Standard delivery/ })
@@ -258,7 +263,7 @@ describe('CheckoutPage', () => {
         'Copperleaf Classic sold out while you were checking out.',
       )
 
-    renderPage(<CheckoutPage />, { route: '/checkout' })
+    renderPage(<CheckoutPage />, { route: '/checkout', auth: true })
     await screen.findByRole('heading', { name: 'Checkout' })
     await fillDeliverable(user)
     await screen.findByRole('radio', { name: /Standard delivery/ })

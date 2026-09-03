@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
-import { Textarea } from '@/components/ui/Textarea'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { useToast } from '@/components/ui/toast.context'
 import { slugify, useFormState } from '@/lib/useFormState'
 import {
@@ -245,12 +245,12 @@ function CategoryFormDialog({
         </Field>
 
         <Field label="Description" error={form.errors.description}>
-          <Textarea
-            rows={3}
+          <RichTextEditor
             value={form.values.description}
-            maxLength={2000}
             disabled={mutation.isPending}
-            onChange={(event) => form.setValue('description', event.target.value)}
+            aria-label="Description"
+            minHeight="9rem"
+            onChange={(html) => form.setValue('description', html)}
           />
         </Field>
 

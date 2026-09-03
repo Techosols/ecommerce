@@ -29,6 +29,7 @@ import { checkoutService } from './checkout.service.js'
 import { ordersService } from './orders.service.js'
 import { customerOrderCardDto, customerOrderDto } from './orders.mapper.js'
 import {
+  guestOrderCancelSchema,
   cancelOrderSchema,
   checkoutSchema,
   guestOrderLookupSchema,
@@ -199,6 +200,53 @@ ordersStorefrontRoutes.post(
     const body = req.body as z.infer<typeof guestOrderLookupSchema>
     const order = await ordersService.lookupGuestOrder(body.orderNumber, body.email)
     return ok(res, customerOrderDto(order))
+  },
+)
+
+/**
+ * A guest cancelling the order they just placed.
+ *
+ * ── Why the same credential is enough ────────────────────────────────────────
+ *
+ * The pair above already lets somebody *read* the order. This lets them stop
+ * one, and three things keep that proportionate:
+ *
+ *   • it resolves through `lookupGuestOrder`, which matches only orders with no
+ *     password on the account — so a registered customer's order can never be
+ *     cancelled this way, whatever number is guessed
+ *   • it can only touch an order that is still pending or confirmed, which is
+ *     the same window the signed-in route has; once something has shipped there
+ *     is nothing here to reach
+ *   • it shares the lookup's rate limit, so walking the number sequence costs
+ *     ten attempts a quarter of an hour
+ *
+ * The alternative is a guest who has to email the shop to stop an order that
+ * has not been packed yet — which is a person's afternoon on both sides.
+ *
+ * Stock always goes back. A customer is not offered the "keep it off the shelf"
+ * choice staff have, and cannot be, because they are not looking at the goods.
+ */
+ordersStorefrontRoutes.post(
+  '/orders/lookup/cancel',
+  ipLimiter({ windowMs: 15 * 60_000, limit: 10 }),
+  validate({ body: guestOrderCancelSchema }),
+  async (req: Request, res: Response) => {
+    const body = req.body as z.infer<typeof guestOrderCancelSchema>
+    const order = await ordersService.lookupGuestOrder(body.orderNumber, body.email)
+
+    if (order.status !== 'pending' && order.status !== 'confirmed') {
+      throw new NotFoundError('That order can no longer be cancelled')
+    }
+
+    const cancelled = await ordersService.cancel(
+      order.id,
+      { reason: body.reason ?? 'Cancelled by the customer', restock: true },
+      // No actor: nobody is signed in. The audit entry records the source,
+      // which is what distinguishes this from a staff cancellation.
+      null,
+      'customer',
+    )
+    return ok(res, customerOrderDto(cancelled))
   },
 )
 

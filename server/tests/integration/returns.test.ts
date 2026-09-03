@@ -131,6 +131,99 @@ describeIfDatabase('returns', () => {
     })
   })
 
+  // ── A guest, with no account ──────────────────────────────────────────────
+
+  describe('a guest with only their order number', () => {
+    /** The pair a guest checkout leaves them holding. */
+    async function guestPaidOrder(quantity = 2) {
+      const product = await sellableProduct(app, owner.accessToken, {
+        priceAmount: 1000,
+        quantity: 50,
+      })
+      const shopper = guest(app)
+      const email = `walkin-${Date.now()}@example.test`
+      await addToCart(shopper, product.variants[0]!.id, quantity)
+      const placed = await checkout(shopper, { shippingMethodId: methodId, email })
+      const orderId = placed.body.data.id as string
+
+      await post(`/admin/orders/${orderId}/confirm`)
+      await post(`/admin/orders/${orderId}/payments`, {})
+
+      const detail = await get(`/admin/orders/${orderId}`)
+      return {
+        orderId,
+        orderNumber: placed.body.data.orderNumber as string,
+        email,
+        lineId: detail.body.data.items[0].id as string,
+      }
+    }
+
+    it('can see what is still returnable', async () => {
+      const order = await guestPaidOrder(2)
+
+      const res = await request(app)
+        .post('/api/v1/storefront/orders/lookup/returnable')
+        .send({ orderNumber: order.orderNumber, email: order.email })
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.eligible).toBe(true)
+      expect(res.body.data.lines[0].returnableQuantity).toBe(2)
+    })
+
+    it('can open a return', async () => {
+      const order = await guestPaidOrder(2)
+
+      const res = await request(app)
+        .post('/api/v1/storefront/orders/lookup/returns')
+        .send({
+          orderNumber: order.orderNumber,
+          email: order.email,
+          reason: 'damaged',
+          lines: [{ orderItemId: order.lineId, quantity: 1 }],
+        })
+
+      expect(res.status).toBe(201)
+      expect(res.body.data.lines[0].quantity).toBe(1)
+    })
+
+    it('needs both halves of the claim', async () => {
+      // The same indistinguishable 404 as the order lookup, so neither half can
+      // be discovered by trying the other.
+      const order = await guestPaidOrder(2)
+
+      const wrongEmail = await request(app)
+        .post('/api/v1/storefront/orders/lookup/returnable')
+        .send({ orderNumber: order.orderNumber, email: 'someone@else.test' })
+      expect(wrongEmail.status).toBe(404)
+
+      const wrongNumber = await request(app)
+        .post('/api/v1/storefront/orders/lookup/returnable')
+        .send({ orderNumber: '#000000', email: order.email })
+      expect(wrongNumber.status).toBe(404)
+    })
+
+    it('cannot reach an order that belongs to a registered account', async () => {
+      // The guest claim resolves only orders with no password on the account.
+      // Without that, anyone knowing a customer's address could walk the number
+      // sequence and open returns against their history.
+      const customer = await createUserAndLogin(app, { roles: ['customer'] })
+      const product = await sellableProduct(app, owner.accessToken, { quantity: 10 })
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: customer.user.email,
+        token: customer.accessToken,
+      })
+
+      const res = await request(app)
+        .post('/api/v1/storefront/orders/lookup/returnable')
+        .send({ orderNumber: placed.body.data.orderNumber, email: customer.user.email })
+
+      expect(res.status).toBe(404)
+    })
+  })
+
   // ── Opening ───────────────────────────────────────────────────────────────
 
   describe('opening a return', () => {

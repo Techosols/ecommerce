@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { QueryBoundary } from '@/components/states/QueryBoundary'
+import { richTextToPlain } from '@/lib/richText'
 import { useStoreSettings } from '@/features/settings/useSettings'
 import { ProductCard } from '../components/ProductCard'
 import { ProductGridSkeleton } from './ProductListPage'
@@ -71,8 +72,13 @@ export function HomePage() {
                   <span className="text-ink font-medium">{collection.title}</span>
                   <ArrowRight className="text-faint group-hover:text-brand-600 size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
                 </span>
+                {/* The words only. A description can hold headings, a table or
+                    an image, none of which belong in a two-line teaser inside
+                    a card. */}
                 {collection.description ? (
-                  <span className="text-muted line-clamp-2 text-sm">{collection.description}</span>
+                  <span className="text-muted line-clamp-2 text-sm">
+                    {richTextToPlain(collection.description)}
+                  </span>
                 ) : null}
               </Link>
             ))}

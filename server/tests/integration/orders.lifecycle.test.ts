@@ -456,6 +456,113 @@ describeIfDatabase('order lifecycle', () => {
 
   // ── What a customer may see ───────────────────────────────────────────────
 
+  describe('a guest cancelling their own order', () => {
+    const cancelAsGuest = (body: object) =>
+      request(app).post('/api/v1/storefront/orders/lookup/cancel').send(body)
+
+    async function guestOrder(email = 'canceller@example.test') {
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      const res = await checkout(shopper, { shippingMethodId: methodId, email })
+      return { orderNumber: res.body.data.orderNumber as string, id: res.body.data.id as string }
+    }
+
+    it('cancels an order that has not been packed', async () => {
+      // Without this a guest has to email the shop to stop an order nobody has
+      // touched yet — a person's afternoon on both sides.
+      const order = await guestOrder()
+
+      const res = await cancelAsGuest({
+        orderNumber: order.orderNumber,
+        email: 'canceller@example.test',
+        reason: 'Ordered the wrong size',
+      })
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.status).toBe('cancelled')
+    })
+
+    it('puts the stock back', async () => {
+      const product = await sellableProduct(app, owner.accessToken, { quantity: 5 })
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 2)
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: 'restock@example.test',
+      })
+
+      await cancelAsGuest({
+        orderNumber: placed.body.data.orderNumber,
+        email: 'restock@example.test',
+      })
+
+      const level = await get(`/admin/inventory/variants/${product.variants[0]!.id}`)
+      expect(level.body.data.totals.available).toBe(5)
+    })
+
+    it('needs both halves of the claim', async () => {
+      const order = await guestOrder()
+
+      const wrongEmail = await cancelAsGuest({
+        orderNumber: order.orderNumber,
+        email: 'someone@else.test',
+      })
+      expect(wrongEmail.status).toBe(404)
+
+      const wrongNumber = await cancelAsGuest({
+        orderNumber: '#999999',
+        email: 'canceller@example.test',
+      })
+      expect(wrongNumber.status).toBe(404)
+    })
+
+    it('cannot cancel an order once something has shipped', async () => {
+      const order = await guestOrder('shipped@example.test')
+      await post(`/admin/orders/${order.id}/confirm`)
+      const detail = await get(`/admin/orders/${order.id}`)
+      await post(`/admin/orders/${order.id}/shipments`, {
+        items: [{ orderItemId: detail.body.data.items[0].id, quantity: 1 }],
+      })
+
+      // The route's own guard passes this through — a shipped order is still
+      // `confirmed`, because fulfilment is a separate axis — and the service is
+      // what refuses it. That is the right place for the decision to live: the
+      // storefront cannot be the thing that decides what is too late to stop.
+      const res = await cancelAsGuest({
+        orderNumber: order.orderNumber,
+        email: 'shipped@example.test',
+      })
+      expect(res.status).toBe(422)
+
+      const after = await get(`/admin/orders/${order.id}`)
+      expect(after.body.data.status).not.toBe('cancelled')
+    })
+
+    it('cannot cancel a registered customer’s order', async () => {
+      // The whole reason this is safe to leave public: the guest claim resolves
+      // only orders whose account has no password. Without that, anyone who
+      // knew a customer's address could walk the number sequence and cancel
+      // their shopping.
+      const customer = await createUserAndLogin(app)
+      const product = await sellableProduct(app, owner.accessToken)
+      const shopper = guest(app)
+      await addToCart(shopper, product.variants[0]!.id, 1)
+      const placed = await checkout(shopper, {
+        shippingMethodId: methodId,
+        email: customer.user.email,
+        token: customer.accessToken,
+      })
+
+      const res = await cancelAsGuest({
+        orderNumber: placed.body.data.orderNumber,
+        email: customer.user.email,
+      })
+
+      expect(res.status).toBe(404)
+    })
+  })
+
   describe('scoping', () => {
     it('hides the internal note from the customer’s own view', async () => {
       const customer = await createUserAndLogin(app)

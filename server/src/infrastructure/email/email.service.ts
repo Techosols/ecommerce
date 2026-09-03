@@ -19,6 +19,7 @@ import { queryOne } from '../database/query.js'
 import { isInTransaction } from '../database/transaction.js'
 import { createLogger } from '../logging/logger.js'
 import { QUEUES, enqueue } from '../queue/index.js'
+import { emailSettingsService } from './emailSettings.service.js'
 import { EMAIL_TEMPLATES, type TemplateName, type TemplateProps } from './templates/registry.js'
 
 const log = createLogger('email.service')
@@ -39,7 +40,7 @@ export interface EnqueueEmailInput<T extends TemplateName> {
 
 export interface EnqueuedEmail {
   id: string
-  status: 'queued' | 'suppressed' | 'duplicate'
+  status: 'queued' | 'suppressed' | 'duplicate' | 'disabled'
 }
 
 async function isSuppressed(email: string): Promise<boolean> {
@@ -72,6 +73,25 @@ export const emailService = {
     const subject = (definition.subject as (p: TemplateProps<T>) => string)(props)
     const to = input.to.trim().toLowerCase()
 
+    /**
+     * The one gate every email passes through.
+     *
+     * Here rather than at the fifteen call sites, and deliberately: a call site
+     * added next year cannot forget to check, and turning a mail off is one
+     * decision in one place rather than fifteen.
+     *
+     * Recorded as `disabled` rather than dropped. "Why did nobody get the
+     * shipping email" is then answerable from the table instead of from
+     * somebody's memory of what the settings page said last Tuesday, and it is
+     * a different word from `suppressed`, which means the *recipient* asked us
+     * to stop.
+     */
+    if (!(await emailSettingsService.isEnabled(input.template))) {
+      log.info({ to, template: input.template }, 'template disabled; not sending')
+      const row = await insertMessage({ ...input, to, subject, props, status: 'disabled' })
+      return { id: row.id, status: 'disabled' }
+    }
+
     if (await isSuppressed(to)) {
       log.info({ to, template: input.template }, 'recipient suppressed; not sending')
       const row = await insertMessage({ ...input, to, subject, props, status: 'suppressed' })
@@ -95,7 +115,7 @@ async function insertMessage(input: {
   template: string
   subject: string
   props: unknown
-  status: 'queued' | 'suppressed'
+  status: 'queued' | 'suppressed' | 'disabled'
   dedupeKey?: string
   category?: 'transactional' | 'marketing'
   replyTo?: string

@@ -151,6 +151,18 @@ export const guestOrderLookupSchema = z.strictObject({
   email: emailField,
 })
 
+/**
+ * The guest's credential, plus whatever the action itself needs.
+ *
+ * One base object so no route that acts on a guest's order can accidentally ask
+ * for less than the lookup does.
+ */
+export const guestOrderCancelSchema = z.strictObject({
+  orderNumber: z.string().trim().min(1).max(40),
+  email: emailField,
+  reason: z.string().trim().max(500).nullable().optional(),
+})
+
 export const myOrderListQuery = offsetPaginationQuery
 
 export const idParam = z.strictObject({ id: z.uuid() })

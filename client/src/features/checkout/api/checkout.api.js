@@ -47,6 +47,8 @@ export const checkoutApi = {
    * orders with no account attached, and is rate limited — without it a guest
    * checkout is a one-way door where closing the tab loses the order.
    */
+  cancelAsGuest: (claim) => api.post('/storefront/orders/lookup/cancel', claim),
+
   lookup: (orderNumber, email) =>
     api.post('/storefront/orders/lookup', { orderNumber, email }),
 }

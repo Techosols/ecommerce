@@ -12,6 +12,18 @@ import { RETURN_CONDITIONS, RETURN_REASONS, RETURN_STATUSES } from './returns.ty
 
 export const returnIdParam = z.strictObject({ id: z.uuid() })
 
+/**
+ * The guest's credential for the two return routes that accept one.
+ *
+ * Separate objects rather than one with optional halves: a route that can be
+ * called with the credential missing is a route that will one day be called
+ * without it.
+ */
+export const guestOrderClaimSchema = z.strictObject({
+  orderNumber: z.string().trim().min(1).max(40),
+  email: z.email().max(320),
+})
+
 export const openReturnSchema = z.strictObject({
   reason: z.enum(RETURN_REASONS),
   customerNote: z.string().trim().max(1000).nullable().optional(),
@@ -24,6 +36,12 @@ export const openReturnSchema = z.strictObject({
     )
     .min(1)
     .max(200),
+})
+
+/** The same request, from somebody with no account. */
+export const guestOpenReturnSchema = openReturnSchema.extend({
+  orderNumber: z.string().trim().min(1).max(40),
+  email: z.email().max(320),
 })
 
 /** Approve, decline, mark in transit, cancel and close all carry only a note. */

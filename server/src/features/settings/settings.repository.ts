@@ -36,6 +36,7 @@ interface SettingsRow {
   bank_iban: string | null
   bank_swift: string | null
   bank_instructions: string | null
+  admin_notification_emails: string[]
   order_reservation_hours: number
   logo_media_id: string | null
   metadata: Record<string, unknown>
@@ -72,6 +73,7 @@ function toSettings(row: SettingsRow): StoreSettings {
     bankIban: row.bank_iban,
     bankSwift: row.bank_swift,
     bankInstructions: row.bank_instructions,
+    adminNotificationEmails: row.admin_notification_emails ?? [],
     orderReservationHours: row.order_reservation_hours,
     logoMediaId: row.logo_media_id,
     metadata: row.metadata,
@@ -109,6 +111,7 @@ const COLUMNS: Record<keyof StoreSettingsUpdate, string> = {
   bankIban: 'bank_iban',
   bankSwift: 'bank_swift',
   bankInstructions: 'bank_instructions',
+  adminNotificationEmails: 'admin_notification_emails',
   orderReservationHours: 'order_reservation_hours',
   logoMediaId: 'logo_media_id',
   metadata: 'metadata',

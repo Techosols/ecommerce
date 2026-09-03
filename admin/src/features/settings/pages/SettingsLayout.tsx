@@ -13,6 +13,7 @@ interface SettingsSection {
 
 const SECTIONS: SettingsSection[] = [
   { to: '/settings', label: 'Store', permission: 'settings:read', end: true },
+  { to: '/settings/emails', label: 'Emails', permission: 'settings:read' },
   { to: '/settings/staff', label: 'Staff', permission: 'staff:read' },
   { to: '/settings/audit', label: 'Audit trail', permission: 'audit:read' },
   { to: '/settings/account', label: 'Your account' },
@@ -43,7 +44,10 @@ export function SettingsLayout() {
   return (
     <div className="flex flex-col gap-6">
       {visible.length > 1 ? (
-        <nav aria-label="Settings sections" className="border-line flex gap-1 overflow-x-auto border-b">
+        <nav
+          aria-label="Settings sections"
+          className="border-line flex gap-1 overflow-x-auto border-b"
+        >
           {visible.map((section) => (
             <NavLink
               key={section.to}

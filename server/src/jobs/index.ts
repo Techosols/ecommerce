@@ -20,6 +20,7 @@ import {
 } from '../infrastructure/queue/index.js'
 import { publish } from '../events/index.js'
 import { emailSendHandler } from './email/emailSend.job.js'
+import { recoverStuckEmailsHandler } from './email/recoverStuck.job.js'
 import { cleanupEventsHandler, cleanupIdempotencyHandler } from './cleanup/cleanup.jobs.js'
 import { cleanupSessionsHandler } from './cleanup/sessions.job.js'
 import { processImageHandler } from './media/processImage.job.js'
@@ -33,6 +34,7 @@ const log = createLogger('jobs')
 
 export async function registerAllJobs(): Promise<void> {
   await register(QUEUES.EMAIL_SEND, emailSendHandler)
+  await register(QUEUES.EMAIL_RECOVER_STUCK, recoverStuckEmailsHandler)
   await register(QUEUES.CLEANUP_IDEMPOTENCY, cleanupIdempotencyHandler)
   await register(QUEUES.CLEANUP_EVENTS, cleanupEventsHandler)
   await register(QUEUES.CLEANUP_SESSIONS, cleanupSessionsHandler)
