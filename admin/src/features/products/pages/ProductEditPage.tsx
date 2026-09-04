@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { MetafieldsCard } from '@/features/metafields/components/MetafieldsCard'
 import { ArchiveRestore, ExternalLink, MoreHorizontal, Package, Undo2 } from 'lucide-react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -506,6 +507,11 @@ export function ProductEditPage() {
                   with the product's fields, because adding to a collection is a
                   different operation from editing a title. */}
               <ProductCollectionsCard productId={product.id} canWrite={canWrite} />
+
+              {/* Also outside the form, and for the same reason: custom fields
+                  are validated and stored by their own endpoint, in one
+                  transaction of their own. */}
+              <MetafieldsCard ownerType="product" ownerId={product.id} canWrite={canWrite} />
             </div>
           </form>
 

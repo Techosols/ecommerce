@@ -14,6 +14,7 @@ interface SettingsSection {
 const SECTIONS: SettingsSection[] = [
   { to: '/settings', label: 'Store', permission: 'settings:read', end: true },
   { to: '/settings/emails', label: 'Emails', permission: 'settings:read' },
+  { to: '/settings/custom-fields', label: 'Custom fields', permission: 'settings:read' },
   { to: '/settings/staff', label: 'Staff', permission: 'staff:read' },
   { to: '/settings/audit', label: 'Audit trail', permission: 'audit:read' },
   { to: '/settings/account', label: 'Your account' },

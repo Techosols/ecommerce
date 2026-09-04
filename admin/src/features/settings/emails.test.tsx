@@ -53,6 +53,8 @@ const logEntry = (overrides = {}) => ({
   attempts: 1,
   lastError: null,
   provider: 'smtp',
+  providerResponse: '250 OK id=1r4Xy2-0008Kt-9s',
+  providerMessageId: '<abc@stdbeauty.com>',
   sentAt: '2026-09-02T10:00:00.000Z',
   createdAt: '2026-09-02T10:00:00.000Z',
   ...overrides,
@@ -294,5 +296,42 @@ describe('the delivery log', () => {
 
     const table = await screen.findByRole('table')
     expect(within(table).getByText('Off')).toBeInTheDocument()
+  })
+})
+
+/**
+ * The receipt behind "Sent".
+ *
+ * These two are the difference between a log that answers "the customer says
+ * it never arrived" and one that just repeats the claim being disputed.
+ */
+describe('what "Sent" is evidence of', () => {
+  it('shows the mail server’s own reply on a sent message', async () => {
+    routes(api, [logEntry()], { sent: 1 })
+    await renderAuthed(<EmailsPage />, { route: '/settings/emails' })
+
+    const table = await screen.findByRole('table')
+    // The queue id, which is what a receiving postmaster can actually look up.
+    expect(within(table).getByText('250 OK id=1r4Xy2-0008Kt-9s')).toBeInTheDocument()
+  })
+
+  it('says plainly when the configured provider sent nothing at all', async () => {
+    routes(
+      api,
+      [
+        logEntry({
+          provider: 'console',
+          providerResponse:
+            'Not sent. EMAIL_PROVIDER=console wrote this message to tmp/mail/x.eml instead of delivering it.',
+        }),
+      ],
+      { sent: 1 },
+    )
+    await renderAuthed(<EmailsPage />, { route: '/settings/emails' })
+
+    const table = await screen.findByRole('table')
+    // Still recorded 'sent' — nothing failed — but the row must not let an
+    // operator believe a customer received it.
+    expect(within(table).getByText(/Not sent\. EMAIL_PROVIDER=console/)).toBeInTheDocument()
   })
 })

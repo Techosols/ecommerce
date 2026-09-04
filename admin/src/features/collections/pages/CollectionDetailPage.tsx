@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { MetafieldsCard } from '@/features/metafields/components/MetafieldsCard'
 import { ArrowLeft, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -247,6 +248,12 @@ function CollectionDetailView({
               </Field>
             </CardBody>
           </Card>
+
+          <MetafieldsCard
+            ownerType="collection"
+            ownerId={collection.id}
+            canWrite={canWrite}
+          />
         </div>
       </div>
     </>

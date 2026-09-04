@@ -145,12 +145,23 @@ export async function emailSendHandler(
     await execute(
       `UPDATE email_messages
           SET status = 'sent', provider = $2, provider_message_id = $3,
-              sent_at = now(), last_error = NULL
+              provider_response = $4, sent_at = now(), last_error = NULL
         WHERE id = $1`,
-      [row.id, provider.name, result.providerMessageId],
+      [row.id, provider.name, result.providerMessageId, result.providerResponse ?? null],
       { name: 'email.markSent' },
     )
-    ctx.logger.info({ emailMessageId: row.id, template: row.template }, 'email sent')
+    ctx.logger.info(
+      {
+        emailMessageId: row.id,
+        template: row.template,
+        to: row.to_email,
+        provider: provider.name,
+        // At info, not debug: this is the line somebody greps for at the point
+        // a customer says nothing arrived.
+        response: result.providerResponse,
+      },
+      'email handed to provider',
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     // Back to `queued` so the retry can claim it again; leaving it `sending`

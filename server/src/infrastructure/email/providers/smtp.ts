@@ -88,12 +88,16 @@ export class SmtpEmailProvider implements EmailProvider {
       )
     }
 
-    // The server's own words, kept for the failure that only shows up later —
-    // a "250 OK queued as ..." is what a postmaster asks for when a message
-    // was accepted here and never arrived there.
+    // The server's own words, kept on the row rather than only in a debug log —
+    // a "250 OK queued as ..." is what a postmaster asks for when a message was
+    // accepted here and never arrived there, and a log line rotated away a
+    // fortnight ago cannot answer that.
     log.debug({ to: message.to, response: info.response }, 'smtp accepted')
 
-    return { providerMessageId: info.messageId }
+    return {
+      providerMessageId: info.messageId,
+      ...(info.response ? { providerResponse: info.response } : {}),
+    }
   }
 
   async verify(): Promise<void> {

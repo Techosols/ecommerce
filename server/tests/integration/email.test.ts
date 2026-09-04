@@ -323,3 +323,111 @@ describeIfDatabase('email pipeline', () => {
     ).rejects.toThrow()
   })
 })
+
+/**
+ * What `sent` is evidence of.
+ *
+ * `sent` means the provider accepted the message and did not refuse the
+ * recipient. That is a handover, and everything after it happens on somebody
+ * else's machine — so the shop keeps the provider's own words about the
+ * handover, which is the only thing it can honestly say about a message
+ * somebody insists never arrived.
+ */
+describeIfDatabase('the receipt behind "sent"', () => {
+  const props = { environment: 'test', triggeredAt: '2026-08-29T10:00:00Z' }
+
+  beforeAll(setupDatabase)
+  afterEach(async () => {
+    setEmailProvider(undefined)
+    await truncateAll()
+  })
+  afterAll(teardownDatabase)
+
+  it('keeps what the mail server said when it took the message', async () => {
+    setEmailProvider({
+      name: 'smtp',
+      async send() {
+        return {
+          providerMessageId: '<abc@stdbeauty.com>',
+          providerResponse: '250 OK id=1r4Xy2-0008Kt-9s',
+        }
+      },
+    })
+
+    const { id } = await emailService.enqueue({
+      to: 'buyer@example.test',
+      template: 'system-check',
+      props,
+    })
+    await emailSendHandler({ emailMessageId: id }, jobContext())
+
+    const row = await queryOne<{
+      status: string
+      provider: string
+      provider_response: string
+      provider_message_id: string
+    }>(
+      `SELECT status, provider, provider_response, provider_message_id
+         FROM email_messages WHERE id = $1`,
+      [id],
+    )
+
+    expect(row).toMatchObject({
+      status: 'sent',
+      provider: 'smtp',
+      // The queue id a receiving postmaster can look up. Without this the row
+      // says only that our own software believes it sent something.
+      provider_response: '250 OK id=1r4Xy2-0008Kt-9s',
+      provider_message_id: '<abc@stdbeauty.com>',
+    })
+  })
+
+  it('records a provider that says nothing rather than inventing reassurance', async () => {
+    setEmailProvider({
+      name: 'quiet',
+      async send() {
+        return { providerMessageId: 'quiet-1' }
+      },
+    })
+
+    const { id } = await emailService.enqueue({
+      to: 'quiet@example.test',
+      template: 'system-check',
+      props,
+    })
+    await emailSendHandler({ emailMessageId: id }, jobContext())
+
+    const row = await queryOne<{ status: string; provider_response: string | null }>(
+      `SELECT status, provider_response FROM email_messages WHERE id = $1`,
+      [id],
+    )
+    expect(row?.status).toBe('sent')
+    expect(row?.provider_response).toBeNull()
+  })
+
+  it('says on the row when the configured provider delivered nothing at all', async () => {
+    // The console provider is the *default*, writes .eml files to disk, and
+    // reports success — so its rows read `sent` exactly like a real delivery.
+    // This is the one case where `sent` would actively mislead, so the row
+    // carries the contradiction rather than leaving it to whoever remembers
+    // what EMAIL_PROVIDER is set to.
+    const { ConsoleEmailProvider } = await import(
+      '../../src/infrastructure/email/providers/console.js'
+    )
+    setEmailProvider(new ConsoleEmailProvider())
+
+    const { id } = await emailService.enqueue({
+      to: 'nowhere@example.test',
+      template: 'system-check',
+      props,
+    })
+    await emailSendHandler({ emailMessageId: id }, jobContext())
+
+    const row = await queryOne<{ status: string; provider_response: string }>(
+      `SELECT status, provider_response FROM email_messages WHERE id = $1`,
+      [id],
+    )
+    expect(row?.status).toBe('sent')
+    expect(row?.provider_response).toMatch(/^Not sent\. EMAIL_PROVIDER=console/)
+  })
+})

@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn'
 import { useFormState } from '@/lib/useFormState'
 import { useUpdateVariant } from '../hooks/products.hooks'
 import type { ProductMedia, ProductVariant } from '../types/products.types'
+import { MetafieldsCard } from '@/features/metafields/components/MetafieldsCard'
 import { VariantInventoryPanel } from './VariantInventoryPanel'
 import { toVariantFormValues, toVariantPatch, variantLabel, type VariantFormValues } from './variantForm'
 
@@ -278,6 +279,15 @@ export function VariantDrawer({
           <h3 className="text-ink mb-2 text-sm font-semibold">Inventory</h3>
           <VariantInventoryPanel variantId={variant.id} disabled={variant.isArchived} />
         </section>
+
+        {/* Per-variant custom fields — a shade's hex code, a size's volume.
+            Renders nothing at all unless fields are defined for variants, so a
+            shop that has none never sees an empty section here. */}
+        <MetafieldsCard
+          ownerType="variant"
+          ownerId={variant.id}
+          canWrite={canEdit && !variant.isArchived}
+        />
       </div>
     </Drawer>
   )

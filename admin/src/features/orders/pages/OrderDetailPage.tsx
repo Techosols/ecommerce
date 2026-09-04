@@ -32,6 +32,7 @@ import {
 } from '../hooks/orders.hooks'
 import { RefundDialog } from '@/features/returns/components/RefundDialog'
 import { useOrderReturns } from '@/features/returns/hooks/returns.hooks'
+import { MetafieldsCard } from '@/features/metafields/components/MetafieldsCard'
 import { TrackingTimeline } from '@/features/shipping/components/TrackingTimeline'
 import { useCarrierCapabilities } from '@/features/shipping/hooks/carrier.hooks'
 import { statusTones as returnTones } from '@/features/returns/components/returnLabels'
@@ -522,6 +523,8 @@ export function OrderDetailPage() {
               </Card>
 
               <OrderAnnotationsCard order={order} canWrite={canWrite} />
+
+              <MetafieldsCard ownerType="order" ownerId={order.id} canWrite={canWrite} />
             </div>
           </div>
 

@@ -44,6 +44,15 @@ export interface EmailLogEntry {
   attempts: number
   lastError: string | null
   provider: string | null
+  /**
+   * What the provider said when it took the message.
+   *
+   * Shown beside `sent`, because `sent` is a claim about a handover and this is
+   * the evidence for it — including the case where the evidence says no mail
+   * left the building at all.
+   */
+  providerResponse: string | null
+  providerMessageId: string | null
   sentAt: string | null
   createdAt: string
 }
@@ -57,6 +66,8 @@ interface Row {
   attempts: number
   last_error: string | null
   provider: string | null
+  provider_response: string | null
+  provider_message_id: string | null
   sent_at: Date | null
   created_at: Date
 }
@@ -71,6 +82,8 @@ function toEntry(row: Row): EmailLogEntry {
     attempts: row.attempts,
     lastError: row.last_error,
     provider: row.provider,
+    providerResponse: row.provider_response,
+    providerMessageId: row.provider_message_id,
     sentAt: row.sent_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
   }
@@ -107,7 +120,7 @@ export const emailLogService = {
     params.push(filter.limit, filter.offset)
     const rows = await query<Row>(
       `SELECT id, to_email, template, subject, status, attempts, last_error, provider,
-              sent_at, created_at
+              provider_response, provider_message_id, sent_at, created_at
          FROM email_messages
          ${clause}
         ORDER BY created_at DESC
@@ -141,7 +154,7 @@ export const emailLogService = {
           SET status = 'queued', attempts = 0, last_error = NULL
         WHERE id = $1 AND status IN ('failed', 'queued', 'sending')
         RETURNING id, to_email, template, subject, status, attempts, last_error, provider,
-                  sent_at, created_at`,
+                  provider_response, provider_message_id, sent_at, created_at`,
       [id],
       { name: 'emailLog.retry' },
     )

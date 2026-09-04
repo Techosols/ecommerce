@@ -38,7 +38,21 @@ export class ConsoleEmailProvider implements EmailProvider {
     await writeFile(file, eml, 'utf8')
 
     log.info({ to: message.to, subject: message.subject, file }, 'email written to disk')
-    return { providerMessageId: id }
+
+    /**
+     * Said out loud on the row, because this provider is the default.
+     *
+     * A message handled here is recorded `sent` like any other — it did what
+     * this provider does, and nothing failed. But nothing left the building
+     * either, and "the delivery log says sent and the customer never got it" is
+     * exactly what that looks like from the outside. An operator reading the
+     * log should not have to know what `EMAIL_PROVIDER` is set to in order to
+     * work that out.
+     */
+    return {
+      providerMessageId: id,
+      providerResponse: `Not sent. EMAIL_PROVIDER=console wrote this message to ${file} instead of delivering it.`,
+    }
   }
 
   async verify(): Promise<void> {

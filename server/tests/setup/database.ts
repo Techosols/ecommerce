@@ -80,6 +80,7 @@ export async function truncateAll(): Promise<void> {
               carts, orders, payments, refunds, webhook_events,
               shipping_zones, shipping_methods, shipments,
               discounts, discount_redemptions,
+              metafield_definitions,
               notifications, notification_preferences,
               analytics_events, analytics_daily_sales, analytics_product_daily
      RESTART IDENTITY CASCADE`,

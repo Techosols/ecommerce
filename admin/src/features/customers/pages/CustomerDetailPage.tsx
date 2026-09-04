@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { MetafieldsCard } from '@/features/metafields/components/MetafieldsCard'
 import { ArrowLeft, Ban, CheckCircle2, RefreshCw, Users } from 'lucide-react'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -381,6 +382,8 @@ function CustomerDetailView({ customer, canWrite, canReadOrders, toast }: ViewPr
               </CardBody>
             </Card>
           ) : null}
+
+          <MetafieldsCard ownerType="customer" ownerId={customer.id} canWrite={canWrite} />
         </div>
       </div>
 

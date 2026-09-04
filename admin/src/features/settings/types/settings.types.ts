@@ -170,6 +170,9 @@ export interface EmailLogEntry {
   attempts: number
   lastError: string | null
   provider: string | null
+  /** The provider's own words when it took the message — evidence of handover. */
+  providerResponse: string | null
+  providerMessageId: string | null
   sentAt: string | null
   createdAt: string
 }

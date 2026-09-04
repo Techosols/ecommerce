@@ -19,6 +19,7 @@ import { DiscountListPage } from '@/features/discounts/pages/DiscountListPage'
 import { AccountPage } from '@/features/settings/pages/AccountPage'
 import { AuditLogPage } from '@/features/settings/pages/AuditLogPage'
 import { EmailsPage } from '@/features/settings/pages/EmailsPage'
+import { MetafieldsPage } from '@/features/metafields/pages/MetafieldsPage'
 import { SettingsLayout } from '@/features/settings/pages/SettingsLayout'
 import { StaffPage } from '@/features/settings/pages/StaffPage'
 import { StoreSettingsPage } from '@/features/settings/pages/StoreSettingsPage'
@@ -149,6 +150,10 @@ export function AppRoutes() {
             <Route element={<ProtectedRoute permission="settings:read" />}>
               <Route path="/settings" element={<StoreSettingsPage />} />
               <Route path="/settings/emails" element={<EmailsPage />} />
+              {/* Defining fields is store configuration and sits behind the
+                  settings permission; filling them in happens on the record
+                  itself, behind that record's own permission. */}
+              <Route path="/settings/custom-fields" element={<MetafieldsPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="staff:read" />}>
               <Route path="/settings/staff" element={<StaffPage />} />

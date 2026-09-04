@@ -16,6 +16,7 @@ import { ok, paginated } from '../../shared/http/respond.js'
 import { buildPaginationMeta, toOffset } from '../../shared/http/pagination.js'
 import { validate, validatedQuery } from '../../shared/middleware/validate.js'
 import { NotFoundError } from '../../shared/errors/index.js'
+import { metafieldsService } from '../metafields/index.js'
 import { productsService } from './products.service.js'
 import { categoriesService, collectionsService } from './taxonomy.service.js'
 import {
@@ -149,6 +150,16 @@ catalogueStorefrontRoutes.get(
     if (!collection || collection.archivedAt || !collection.isActive) {
       throw new NotFoundError('Collection not found')
     }
-    return ok(res, publicCollectionDto(collection))
+    /*
+     * Custom fields on the detail read only.
+     *
+     * The collection *list* above deliberately does not carry them: it renders
+     * a nav menu, and one query per collection to build fields nobody displays
+     * there is a cost paid on every page that shows the menu.
+     */
+    return ok(res, {
+      ...publicCollectionDto(collection),
+      metafields: await metafieldsService.publicFor('collection', collection.id),
+    })
   },
 )

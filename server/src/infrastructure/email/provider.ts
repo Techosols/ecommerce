@@ -16,6 +16,19 @@ export interface OutboundMessage {
 
 export interface SendResult {
   providerMessageId: string
+  /**
+   * What the provider said when it took the message.
+   *
+   * Kept because `sent` is a claim about a handover, not about a delivery, and
+   * the difference only ever matters at the worst moment — somebody insisting
+   * an email never arrived. An SMTP `250 OK id=…` turns that conversation from
+   * "our software says it sent it" into a queue id the receiving postmaster can
+   * actually look up.
+   *
+   * Optional: a provider that says nothing useful should return nothing rather
+   * than manufacture a reassuring string.
+   */
+  providerResponse?: string
 }
 
 export interface EmailProvider {

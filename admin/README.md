@@ -266,9 +266,32 @@ behind them and a control that cannot work is worse than an absent one:
 | Theme templates ("Theme template" select) | The storefront renders from React routes, not from named Liquid templates. |
 | Sales-channel picker in the editor | Publication is per channel and per endpoint. The editor shows publish/unpublish only; a multi-channel picker would imply a bulk API that does not exist. |
 | Cross-resource search in the top bar | No endpoint searches products, orders and customers together. The field is present and disabled rather than faked. |
-| Metafields, product bundles, gift-card products | No schema for any of them. |
+| Product bundles, gift-card products | No schema for either of them. |
 
 Adding any of these is a server change first. Nothing in the admin fakes them.
+
+## Custom fields (metafields)
+
+Extra fields the shop defines for itself, on products, variants, collections,
+customers and orders. **Settings → Custom fields** is where they are defined;
+the values are filled in on the record itself, in a card that builds its inputs
+from the definitions rather than from anything hand-written per page.
+
+Three rules are worth knowing before using them:
+
+- **The type is fixed once a field exists.** Values are already stored against
+  it, so changing a text field to a number would leave every stored value
+  invalid under its own definition. The label renames freely.
+- **Fields are private by default.** A definition has to be marked *Customers
+  can see this* before it appears in the public product or collection API. The
+  filter is in the server's query, not in a serializer.
+- **Permissions follow the record, not the field.** Defining fields needs
+  `settings:write`; filling one in needs the permission on the thing being
+  edited — `catalog:write` for a product, `customers:write` for a customer,
+  `orders:write` for an order.
+
+Deleting a definition deletes every value under it, and the confirmation says
+how many.
 
 ## The design system
 

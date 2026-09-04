@@ -47,6 +47,7 @@ import { returnsAdminRoutes } from './features/returns/returns.admin.routes.js'
 import { shippingStorefrontRoutes } from './features/shipping/shipping.routes.js'
 import { shippingAdminRoutes } from './features/shipping/shipping.admin.routes.js'
 import { codAdminRoutes } from './features/shipping/cod.admin.routes.js'
+import { metafieldsAdminRoutes } from './features/metafields/index.js'
 import { discountsStorefrontRoutes } from './features/discounts/discounts.routes.js'
 import { discountsAdminRoutes } from './features/discounts/discounts.admin.routes.js'
 import {
@@ -114,6 +115,7 @@ adminRouter.use(analyticsAdminRoutes)
 // mounted in its "authenticated" form and does not verify the token twice.
 adminRouter.use(notificationsAdminRoutes)
 adminRouter.use(auditAdminRoutes)
+adminRouter.use(metafieldsAdminRoutes)
 
 export const webhookRouter: Router = Router()
 // Raw body first: a signature is computed over the exact bytes sent (§16.6).

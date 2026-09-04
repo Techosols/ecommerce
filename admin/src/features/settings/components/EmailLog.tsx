@@ -23,9 +23,14 @@ import type { EmailLogEntry, EmailLogStatus } from '../types/settings.types'
  * screen the only way to tell them apart was a psql prompt. Each row here says
  * which one it was, in the provider's own words:
  *
- *   **Sent** — the mail server accepted it. If it did not arrive, the problem
- *   is past this shop: SPF, DKIM or DMARC on the sending domain, or a spam
- *   folder. The place to look next is the mail server's own log.
+ *   **Sent** — the mail server *accepted* it, and said so. That is a handover,
+ *   not a delivery: everything after it happens on somebody else's machine.
+ *   The server's own reply is shown beside the row — a `250 OK id=…` is the
+ *   queue id a receiving postmaster can look up, and it is the difference
+ *   between "our software says it sent" and evidence. If a message reads Sent
+ *   and never arrived, the causes are an asynchronous bounce (which lands in
+ *   the sending mailbox), a spam folder, SPF/DKIM/DMARC on the sending domain,
+ *   or an outgoing filter on the host — in that order of likelihood.
  *
  *   **Waiting / Failed with a reason** — the mail server refused it. The reason
  *   is the server's: "relaying denied", "authentication failed", "no such
@@ -51,7 +56,7 @@ const STATUS: Record<
     label: 'Sent',
     tone: 'positive',
     icon: CheckCircle2,
-    hint: 'The mail server accepted it. If it did not arrive, check SPF, DKIM and DMARC on your sending domain, and the recipient’s spam folder.',
+    hint: 'The mail server accepted it and gave the reply shown. That is a handover, not proof of delivery — if it never arrived, check the sending mailbox for a bounce, then the recipient’s spam folder, then SPF/DKIM/DMARC on your domain.',
   },
   queued: {
     label: 'Waiting',
@@ -149,19 +154,54 @@ export function EmailLog({ canEdit = false }: { canEdit?: boolean }) {
     {
       id: 'error',
       header: 'What happened',
-      cell: (row) =>
-        row.lastError ? (
-          // The provider's own sentence, in full on hover. "550 5.7.1 Relaying
-          // denied" tells an operator what to fix; a generic message does not.
-          <span
-            className="text-danger block max-w-[22rem] truncate text-xs"
-            title={row.lastError}
-          >
-            {row.lastError}
-          </span>
-        ) : (
-          <span className="text-faint text-xs">—</span>
-        ),
+      /*
+       * One column, because an operator has one question — "what became of
+       * it?" — and the answer is the provider's own sentence either way.
+       *
+       * A failure shows why it was refused. A success shows the receipt, which
+       * is the row that used to say nothing at all and is exactly the row
+       * somebody is staring at when they say "it claims it sent it".
+       */
+      cell: (row) => {
+        if (row.lastError) {
+          // "550 5.7.1 Relaying denied" tells an operator what to fix; a
+          // generic message does not. Full text on hover.
+          return (
+            <span
+              className="text-danger block max-w-[22rem] truncate text-xs"
+              title={row.lastError}
+            >
+              {row.lastError}
+            </span>
+          )
+        }
+
+        if (row.providerResponse) {
+          /*
+           * Warned rather than reassured when nothing actually left.
+           *
+           * The console provider writes `.eml` files to disk and reports
+           * success, so its rows read Sent like any other. Saying so here is
+           * the whole point: an operator should not have to know what
+           * EMAIL_PROVIDER is set to before believing the log.
+           */
+          const notReallySent = row.providerResponse.startsWith('Not sent.')
+          return (
+            <span
+              className={
+                notReallySent
+                  ? 'text-warning block max-w-[22rem] truncate text-xs'
+                  : 'text-muted block max-w-[22rem] truncate font-mono text-xs'
+              }
+              title={row.providerResponse}
+            >
+              {row.providerResponse}
+            </span>
+          )
+        }
+
+        return <span className="text-faint text-xs">—</span>
+      },
     },
     {
       id: 'attempts',

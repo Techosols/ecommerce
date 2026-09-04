@@ -13,6 +13,7 @@
 import { describeRules } from './products.rules.js'
 import { mediaService } from '../media/index.js'
 import { availabilityService, publicAvailabilityDto } from '../inventory/index.js'
+import { metafieldsService } from '../metafields/index.js'
 import type { VariantAvailability } from '../inventory/index.js'
 import type {
   Category,
@@ -279,6 +280,16 @@ export async function resolveAvailability(
 export async function publicProductDto(
   product: ProductDetail,
   availability?: Map<string, VariantAvailability>,
+  /**
+   * `metafields: false` for the listing path.
+   *
+   * The card mapper below is called once per product in a grid and delegates
+   * here for the shared shape. Fetching custom fields unconditionally would
+   * therefore put two extra queries behind every card on a category page — the
+   * exact N+1 that `publicForMany` exists to avoid — to build fields the card
+   * then throws away.
+   */
+  include: { metafields?: boolean } = {},
 ) {
   const stock = availability ?? (await resolveAvailability([product]))
 
@@ -293,6 +304,25 @@ export async function publicProductDto(
   const media = await imageUrls(product.media)
   // Only what can actually be bought sets the "from" price.
   const prices = purchasable.map((variant) => variant.price.amount)
+
+  /*
+   * The shop's own custom fields, and only the ones marked public.
+   *
+   * Two queries, not one per variant: `publicForMany` fetches every variant's
+   * fields at once, because a product with fourteen shades would otherwise be
+   * fourteen extra round trips on the page a customer waits for.
+   *
+   * The visibility filter is in the query, not here — a field nobody made
+   * public never leaves the database, so no later edit to this mapper can
+   * expose one by accident.
+   */
+  const wantsMetafields = include.metafields ?? true
+  const [productMetafields, variantMetafields] = wantsMetafields
+    ? await Promise.all([
+        metafieldsService.publicFor('product', product.id),
+        metafieldsService.publicForMany('variant', sellable.map((variant) => variant.id)),
+      ])
+    : ([[], new Map<string, never[]>()] as const)
 
   return {
     id: product.id,
@@ -321,9 +351,10 @@ export async function publicProductDto(
         swatchHex: value.swatchHex,
       })),
     })),
-    variants: sellable.map((variant) =>
-      publicVariantDto(variant, stock.get(variant.id), media),
-    ),
+    variants: sellable.map((variant) => ({
+      ...publicVariantDto(variant, stock.get(variant.id), media),
+      metafields: variantMetafields.get(variant.id) ?? [],
+    })),
     // Saves every storefront from computing "from £4.50" itself, and from
     // getting it wrong when a variant is unavailable.
     priceRange:
@@ -341,6 +372,7 @@ export async function publicProductDto(
     })),
     // The product is available when at least one of its variants can be bought.
     available: purchasable.length > 0,
+    metafields: productMetafields,
   }
 }
 
@@ -349,7 +381,7 @@ export async function publicProductCardDto(
   product: ProductDetail,
   availability?: Map<string, VariantAvailability>,
 ) {
-  const full = await publicProductDto(product, availability)
+  const full = await publicProductDto(product, availability, { metafields: false })
   return {
     id: full.id,
     handle: full.handle,
